@@ -178,7 +178,7 @@ Module.register("calendar", {
 				this.sendSocketNotification(notification, { url: payload.url, id: this.identifier });
 			}
 		}
-	}
+	},
 
 	// Override socket notification handler.
 	socketNotificationReceived (notification, payload) {
