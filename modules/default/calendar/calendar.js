@@ -169,11 +169,19 @@ Module.register("calendar", {
 		this.selfUpdate();
 	},
 
+	// accept notifications from system and other modules
+	notificationReceived (notification, payload, sender) {
+		if (notification === "FETCH_CALENDAR") {
+			// if we are handling that URL (other cal instances may not be)
+			// this notifcation when to all instances at once
+			if (this.hasCalendarURL(payload.url)) {
+				this.sendSocketNotification(notification, { url: payload.url, id: this.identifier });
+			}
+		}
+	}
+
 	// Override socket notification handler.
 	socketNotificationReceived (notification, payload) {
-		if (notification === "FETCH_CALENDAR") {
-			this.sendSocketNotification(notification, { url: payload.url, id: this.identifier });
-		}
 
 		if (this.identifier !== payload.id) {
 			return;
