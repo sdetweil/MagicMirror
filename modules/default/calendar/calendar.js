@@ -611,10 +611,10 @@ Module.register("calendar", {
 					continue;
 				}
 				if (limitNumberOfEntries) {
-					if (event.endDate < maxPastDaysCompare) {
+					if ((event.endDate < maxPastDaysCompare) && (maxPastDaysCompare < now.getTime())) {
 						continue;
 					}
-					if (this.config.hideOngoing && event.startDate < now) {
+					if (this.config.hideOngoing && event.startDate < now ) {
 						continue;
 					}
 					if (this.config.hideDuplicates && this.listContainsEvent(events, event)) {

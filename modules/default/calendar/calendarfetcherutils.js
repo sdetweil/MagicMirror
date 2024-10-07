@@ -160,7 +160,7 @@ const CalendarFetcherUtils = {
 			}
 
 			if (event.type === "VEVENT") {
-				Log.debug(`Event:\n${JSON.stringify(event)}`);
+				Log.debug("Event:\n",event);
 				let startMoment = eventDate(event, "start");
 				let endMoment;
 
@@ -245,7 +245,7 @@ const CalendarFetcherUtils = {
 
 				const location = event.location || false;
 				const geo = event.geo || false;
-				const description = event.description || false;
+				const description = CalendarFetcherUtils.getTitleFromEvent(event)
 
 				if (event.rrule && typeof event.rrule !== "undefined" && !isFacebookBirthday) {
 					const rule = event.rrule;
@@ -283,12 +283,20 @@ const CalendarFetcherUtils = {
 						}
 						futureLocal = futureMoment.toDate(); // future
 					}
-					Log.debug(`Search for recurring events between: ${pastLocal} and ${futureLocal}`);
+					//Log.debug(`Search for recurring events between: ${pastLocal} and ${futureLocal}`);
 					const hasByWeekdayRule = rule.options.byweekday !== undefined && rule.options.byweekday !== null;
 					const oneDayInMs = 24 * 60 * 60 * 1000;
 					Log.debug(`RRule: ${rule.toString()}`);
 					rule.options.tzid = null; // RRule gets *very* confused with timezones
-					let dates = rule.between(new Date(pastLocal.valueOf() - oneDayInMs), new Date(futureLocal.valueOf() + oneDayInMs), true, () => { return true; });
+
+					// try this without timezone
+					let d1=new Date(new Date(pastLocal.valueOf() - oneDayInMs).getTime())
+					let d2=new Date(new Date(futureLocal.valueOf() + oneDayInMs).getTime())
+//[2024-10-08 01:33:15.365] [DEBUG] Search for recurring events between: Wed Sep 13 2023 12:30:00 GMT+1000 (Australian Eastern Standard Time) and Fri Sep 15 2023 23:59:59 GMT+1000 (Australian Eastern Standard Time)
+					Log.debug(`Search for recurring events between: ${d1} and ${d2}`);
+					let dates = rule.between(d1,d2, true, () => { return true; });
+
+					//let dates = rule.between(new Date(pastLocal.valueOf() - oneDayInMs), new Date(futureLocal.valueOf() + oneDayInMs), true, () => { return true; });
 					Log.debug(`Title: ${event.summary}, with dates: ${JSON.stringify(dates)}`);
 					dates = dates.filter((d) => {
 						if (JSON.stringify(d) === "null") return false;
@@ -296,7 +304,7 @@ const CalendarFetcherUtils = {
 					});
 
 					// RRule can generate dates with an incorrect recurrence date. Process the array here and apply date correction.
-					if (hasByWeekdayRule) {
+					if (false ) { // hasByWeekdayRule) {
 						Log.debug("Rule has byweekday, checking for correction");
 						dates.forEach((date, index, arr) => {
 							// NOTE: getTimezoneOffset() is negative of the expected value. For America/Los_Angeles under DST (GMT-7),
@@ -322,13 +330,13 @@ const CalendarFetcherUtils = {
 					// The dates array from rrule can be confused by DST. If the event was created during DST and we
 					// are querying a date range during non-DST, rrule can have the incorrect time for the date range.
 					// Reprocess the array here computing and applying the time offset.
-					dates.forEach((date, index, arr) => {
+					/* dates.forEach((date, index, arr) => {
 						let adjustHours = CalendarFetcherUtils.calculateTimezoneAdjustment(event, date);
 						if (adjustHours !== 0) {
 							Log.debug(`Applying timezone adjustment hours=${adjustHours} to ${date}`);
 							arr[index] = new Date(date.valueOf() + (adjustHours * 60 * 60 * 1000));
 						}
-					});
+					}); */
 
 					// The "dates" array contains the set of dates within our desired date range range that are valid
 					// for the recurrence rule. *However*, it's possible for us to have a specific recurrence that
@@ -351,14 +359,14 @@ const CalendarFetcherUtils = {
 
 					// Lastly, sometimes rrule doesn't include the event.start even if it is in the requested range. Ensure
 					// inclusion here. Unfortunately dates.includes() doesn't find it so we have to do forEach().
-					{
+					/*{
 						let found = false;
 						dates.forEach((d) => { if (d.valueOf() === event.start.valueOf()) found = true; });
 						if (!found) {
 							Log.debug(`event.start=${event.start} was not included in results from rrule; adding`);
 							dates.splice(0, 0, event.start);
 						}
-					}
+					}*/
 
 					// Loop through the set of date entries to see which recurrences should be added to our event list.
 					for (let d in dates) {
@@ -375,7 +383,7 @@ const CalendarFetcherUtils = {
 						// (see https://momentjs.com/docs/#/displaying/as-iso-string/).
 						// This must be done after `date` is adjusted
 						const dateKey = date.toISOString().substring(0, 10);
-
+						Log.debug("exdate dateKey=",dateKey)
 						// For each date that we're checking, it's possible that there is a recurrence override for that one day.
 						if (curEvent.recurrences !== undefined && curEvent.recurrences[dateKey] !== undefined) {
 							// We found an override, so for this recurrence, use a potentially different title, start date, and duration.
@@ -386,6 +394,7 @@ const CalendarFetcherUtils = {
 						// If there's no recurrence override, check for an exception date.  Exception dates represent exceptions to the rule.
 						else if (curEvent.exdate !== undefined && curEvent.exdate[dateKey] !== undefined) {
 							// This date is an exception date, which means we should skip it in the recurrence pattern.
+							Log.debug("skipping exdate=",dateKey)
 							showRecurrence = false;
 						}
 						Log.debug(`duration: ${curDurationMs}`);
@@ -399,7 +408,7 @@ const CalendarFetcherUtils = {
 
 						// If this recurrence ends before the start of the date range, or starts after the end of the date range, don"t add
 						// it to the event list.
-						if (endMoment.isBefore(pastLocal) || startMoment.isAfter(futureLocal)) {
+						if (endMoment.isBefore(d1) || startMoment.isAfter(d2)) {
 							showRecurrence = false;
 						}
 
@@ -467,6 +476,7 @@ const CalendarFetcherUtils = {
 						Log.warn(`Unexpected timezone adjustment of ${adjustHours} hours on non-recurring event`);
 					}
 					// Every thing is good. Add it to the list.
+					Log.debug(`saving event: ${description}`)
 					newEvents.push({
 						title: title,
 						startDate: startMoment.add(adjustHours, "hours").format("x"),
