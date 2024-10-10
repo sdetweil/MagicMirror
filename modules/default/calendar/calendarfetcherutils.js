@@ -246,7 +246,8 @@ const CalendarFetcherUtils = {
 				const location = event.location || false;
 				const geo = event.geo || false;
 				const description = CalendarFetcherUtils.getTitleFromEvent(event)
-
+				let d1;
+				let d2;
 				if (event.rrule && typeof event.rrule !== "undefined" && !isFacebookBirthday) {
 					const rule = event.rrule;
 
@@ -290,8 +291,8 @@ const CalendarFetcherUtils = {
 					rule.options.tzid = null; // RRule gets *very* confused with timezones
 
 					// try this without timezone
-					let d1=new Date(new Date(pastLocal.valueOf() - oneDayInMs).getTime())
-					let d2=new Date(new Date(futureLocal.valueOf() + oneDayInMs).getTime())
+					d1=new Date(new Date(pastLocal.valueOf() - oneDayInMs).getTime())
+					d2=new Date(new Date(futureLocal.valueOf() + oneDayInMs).getTime())
 //[2024-10-08 01:33:15.365] [DEBUG] Search for recurring events between: Wed Sep 13 2023 12:30:00 GMT+1000 (Australian Eastern Standard Time) and Fri Sep 15 2023 23:59:59 GMT+1000 (Australian Eastern Standard Time)
 					Log.debug(" ".repeat(35))
 					Log.debug(`Search for recurring events between: ${d1} and ${d2}`);
@@ -303,16 +304,18 @@ const CalendarFetcherUtils = {
 						if (JSON.stringify(d) === "null") return false;
 						else return true;
 					});
-					/*
+					if(false){
 					let datesLocal=[]
+					let offset =  moment.tz(d1, event.start.tz).utcOffset();
 					dates.forEach(d =>{
-						const options = { timezone:d.tzid };
-						let dLocal= new Date(d.toISOString().slice(0,-5))
+						let dtext=d.toISOString().slice(0,-5)
+						Log.debug(" date text form without tz=",dtext)
+						let dLocal= new Date(d.valueOf()+offset+1000)
 						Log.debug(" neutralized date=",dLocal);
 						datesLocal.push(dLocal)
-
 					})
-					dates=datesLocal*/
+					dates=datesLocal
+				}
 					// RRule can generate dates with an incorrect recurrence date. Process the array here and apply date correction.
 					if (false ) { // hasByWeekdayRule) {
 						Log.debug("Rule has byweekday, checking for correction");
