@@ -293,6 +293,7 @@ const CalendarFetcherUtils = {
 					let d1=new Date(new Date(pastLocal.valueOf() - oneDayInMs).getTime())
 					let d2=new Date(new Date(futureLocal.valueOf() + oneDayInMs).getTime())
 //[2024-10-08 01:33:15.365] [DEBUG] Search for recurring events between: Wed Sep 13 2023 12:30:00 GMT+1000 (Australian Eastern Standard Time) and Fri Sep 15 2023 23:59:59 GMT+1000 (Australian Eastern Standard Time)
+					Log.debug(" ".repeat(35))
 					Log.debug(`Search for recurring events between: ${d1} and ${d2}`);
 					let dates = rule.between(d1,d2, true, () => { return true; });
 
@@ -302,7 +303,16 @@ const CalendarFetcherUtils = {
 						if (JSON.stringify(d) === "null") return false;
 						else return true;
 					});
+					/*
+					let datesLocal=[]
+					dates.forEach(d =>{
+						const options = { timezone:d.tzid };
+						let dLocal= new Date(d.toISOString().slice(0,-5))
+						Log.debug(" neutralized date=",dLocal);
+						datesLocal.push(dLocal)
 
+					})
+					dates=datesLocal*/
 					// RRule can generate dates with an incorrect recurrence date. Process the array here and apply date correction.
 					if (false ) { // hasByWeekdayRule) {
 						Log.debug("Rule has byweekday, checking for correction");
@@ -345,13 +355,14 @@ const CalendarFetcherUtils = {
 					// because the logic below will filter out any recurrences that don't actually belong within
 					// our display range.
 					// Would be great if there was a better way to handle this.
-					Log.debug(`event.recurrences: ${event.recurrences}`);
+					Log.debug("event.recurrences:",event.recurrences);
 					if (event.recurrences !== undefined) {
 						for (let dateKey in event.recurrences) {
 							// Only add dates that weren't already in the range we added from the rrule so that
 							// we don't double-add those events.
 							let d = new Date(dateKey);
-							if (!moment(d).isBetween(pastMoment, futureMoment)) {
+							if (!moment(d).isBetween(d1,d2)){ //pastMoment, futureMoment)) {
+								Log.debug("adding recurrence event to list ",d)
 								dates.push(d);
 							}
 						}
@@ -377,6 +388,7 @@ const CalendarFetcherUtils = {
 
 						startMoment = moment(date);
 
+						Log.debug("\n"+" ".repeat(34)+"processing repeating event for date=",date)
 						// Remove the time information of each date by using its substring, using the following method:
 						// .toISOString().substring(0,10).
 						// since the date is given as ISOString with YYYY-MM-DDTHH:MM:SS.SSSZ
@@ -387,8 +399,10 @@ const CalendarFetcherUtils = {
 						// For each date that we're checking, it's possible that there is a recurrence override for that one day.
 						if (curEvent.recurrences !== undefined && curEvent.recurrences[dateKey] !== undefined) {
 							// We found an override, so for this recurrence, use a potentially different title, start date, and duration.
+
 							curEvent = curEvent.recurrences[dateKey];
 							startMoment = moment(curEvent.start);
+							Log.debug("found recurrence for ", dateKey," resetting start date to ", curEvent.start)
 							curDurationMs = curEvent.end.valueOf() - startMoment.valueOf();
 						}
 						// If there's no recurrence override, check for an exception date.  Exception dates represent exceptions to the rule.
@@ -445,7 +459,7 @@ const CalendarFetcherUtils = {
 
 					if (config.includePastEvents) {
 						// Past event is too far in the past, so skip.
-						if (endMoment < pastLocalDate) {
+						if (endMoment < d1 ) { //pastLocalDate) {
 							return;
 						}
 					} else {
@@ -461,7 +475,7 @@ const CalendarFetcherUtils = {
 					}
 
 					// It exceeds the maximumNumberOfDays limit, so skip.
-					if (startMoment > futureLocalDate) {
+					if (startMoment > d2) { //futureLocalDate) {
 						return;
 					}
 
