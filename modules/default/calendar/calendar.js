@@ -27,6 +27,7 @@ Module.register("calendar", {
 		timeFormat: "relative",
 		dateFormat: "MMM Do",
 		dateEndFormat: "LT",
+		multiDayEventEndDateFormat:"Do.MMM, HH:mm",
 		fullDayEventDateFormat: "MMM Do",
 		showEnd: false,
 		showEndsOnlyWithDuration: false,
@@ -422,10 +423,16 @@ Module.register("calendar", {
 					timeWrapper.innerHTML = CalendarUtils.capFirst(moment(event.startDate, "x").format(this.config.dateFormat));
 					// Add end time if showEnd
 					if (this.config.showEnd) {
-						// andhas a duation
+						// and has a duation
 						if (event.startDate !== event.endDate) {
+							if(moment(event.startDate,"x").format("YYYYMMDD") === moment(event.endDate,"x").format("YYYYMMDD")){
 								timeWrapper.innerHTML += "-";
 								timeWrapper.innerHTML += CalendarUtils.capFirst(moment(event.endDate, "x").format(this.config.dateEndFormat));
+							}
+							else{
+								timeWrapper.innerHTML += "-";
+								timeWrapper.innerHTML += CalendarUtils.capFirst(moment(event.endDate, "x").format(this.config.multiDayEventEndDateFormat));
+							}
 						}
 					}
 
