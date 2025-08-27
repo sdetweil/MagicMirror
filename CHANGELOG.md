@@ -13,6 +13,10 @@ planned for 2025-10-01
 
 Thanks to: @dathbe.
 
+### Added
+
+- Added configuration option for `User-Agent`, used by calendar & news module (#3255)
+
 ### Changed
 
 - [clock] Add CSS to prevent line breaking of sunset/sunrise time display (#3816)
