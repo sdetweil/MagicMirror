@@ -3,22 +3,24 @@ const path = require("node:path");
 const helmet = require("helmet");
 const { JSDOM } = require("jsdom");
 const express = require("express");
-const sinon = require("sinon");
 const translations = require("../../translations/translations");
 
 /**
- * Helper function to setup DOM environment.
- * @returns {object} The JSDOM window object
+ * Helper function to create a fresh Translator instance with DOM environment.
+ * @returns {object} Object containing window and Translator
  */
-function setupDOMEnvironment () {
-	const dom = new JSDOM("", { runScripts: "dangerously", resources: "usable" });
+function createTranslationTestEnvironment () {
+	// Setup DOM environment with Translator
+	const translatorJs = fs.readFileSync(path.join(__dirname, "..", "..", "js", "translator.js"), "utf-8");
+	const dom = new JSDOM("", { url: "http://localhost:3000", runScripts: "outside-only" });
 
 	dom.window.Log = { log: jest.fn(), error: jest.fn() };
-	const translatorJs = fs.readFileSync(path.join(__dirname, "..", "..", "js", "translator.js"), "utf-8");
 	dom.window.translations = translations;
 	dom.window.eval(translatorJs);
 
-	return dom.window;
+	const window = dom.window;
+
+	return { window, Translator: window.Translator };
 }
 
 describe("translations", () => {
@@ -52,91 +54,76 @@ describe("translations", () => {
 		let dom;
 
 		beforeEach(() => {
-			// Create a new JSDOM instance for each test
-			const window = setupDOMEnvironment();
-			dom = { window };
+			// Create a new translation test environment for each test
+			const env = createTranslationTestEnvironment();
+			const window = env.window;
 
-			// Additional setup for loadTranslations tests
-			dom.window.Translator = {};
-			dom.window.config = { language: "de" };
-
-			// Load class.js and module.js content directly
+			// Load class.js and module.js content directly for loadTranslations tests
 			const classJs = fs.readFileSync(path.join(__dirname, "..", "..", "js", "class.js"), "utf-8");
 			const moduleJs = fs.readFileSync(path.join(__dirname, "..", "..", "js", "module.js"), "utf-8");
 
 			// Execute the scripts in the JSDOM context
-			dom.window.eval(classJs);
-			dom.window.eval(moduleJs);
+			window.eval(classJs);
+			window.eval(moduleJs);
+
+			// Additional setup for loadTranslations tests
+			window.config = { language: "de" };
+
+			dom = { window };
 		});
 
 		it("should load translation file", async () => {
-			await new Promise((resolve) => {
-				dom.window.onload = resolve;
-			});
-
 			const { Translator, Module, config } = dom.window;
 			config.language = "en";
-			Translator.load = sinon.stub().callsFake((_m, _f, _fb) => null);
+			Translator.load = jest.fn().mockImplementation((_m, _f, _fb) => null);
 
 			Module.register("name", { getTranslations: () => translations });
 			const MMM = Module.create("name");
 
 			await MMM.loadTranslations();
 
-			expect(Translator.load.args).toHaveLength(1);
-			expect(Translator.load.calledWith(MMM, "translations/en.json", false)).toBe(true);
+			expect(Translator.load.mock.calls).toHaveLength(1);
+			expect(Translator.load).toHaveBeenCalledWith(MMM, "translations/en.json", false);
 		});
 
 		it("should load translation + fallback file", async () => {
-			await new Promise((resolve) => {
-				dom.window.onload = resolve;
-			});
-
 			const { Translator, Module } = dom.window;
-			Translator.load = sinon.stub().callsFake((_m, _f, _fb) => null);
+			Translator.load = jest.fn().mockImplementation((_m, _f, _fb) => null);
 
 			Module.register("name", { getTranslations: () => translations });
 			const MMM = Module.create("name");
 
 			await MMM.loadTranslations();
 
-			expect(Translator.load.args).toHaveLength(2);
-			expect(Translator.load.calledWith(MMM, "translations/de.json", false)).toBe(true);
-			expect(Translator.load.calledWith(MMM, "translations/en.json", true)).toBe(true);
+			expect(Translator.load.mock.calls).toHaveLength(2);
+			expect(Translator.load).toHaveBeenCalledWith(MMM, "translations/de.json", false);
+			expect(Translator.load).toHaveBeenCalledWith(MMM, "translations/en.json", true);
 		});
 
 		it("should load translation fallback file", async () => {
-			await new Promise((resolve) => {
-				dom.window.onload = resolve;
-			});
-
 			const { Translator, Module, config } = dom.window;
 			config.language = "--";
-			Translator.load = sinon.stub().callsFake((_m, _f, _fb) => null);
+			Translator.load = jest.fn().mockImplementation((_m, _f, _fb) => null);
 
 			Module.register("name", { getTranslations: () => translations });
 			const MMM = Module.create("name");
 
 			await MMM.loadTranslations();
 
-			expect(Translator.load.args).toHaveLength(1);
-			expect(Translator.load.calledWith(MMM, "translations/en.json", true)).toBe(true);
+			expect(Translator.load.mock.calls).toHaveLength(1);
+			expect(Translator.load).toHaveBeenCalledWith(MMM, "translations/en.json", true);
 		});
 
 		it("should load no file", async () => {
-			await new Promise((resolve) => {
-				dom.window.onload = resolve;
-			});
-
 			const { Translator, Module } = dom.window;
-			Translator.load = sinon.stub();
+			Translator.load = jest.fn();
 
 			Module.register("name", {});
 			const MMM = Module.create("name");
 
 			await MMM.loadTranslations();
 
-			expect(Translator.load.callCount).toBe(0);
+			expect(Translator.load.mock.calls).toHaveLength(0);
 		});
 	});
 
@@ -150,13 +137,7 @@ describe("translations", () => {
 	describe("parsing language files through the Translator class", () => {
 		for (const language in translations) {
 			it(`should parse ${language}`, async () => {
-				const window = setupDOMEnvironment();
-
-				await new Promise((resolve) => {
-					window.onload = resolve;
-				});
-
-				const { Translator } = window;
+				const { Translator } = createTranslationTestEnvironment();
 				await Translator.load(mmm, translations[language], false);
 
 				expect(typeof Translator.translations[mmm.name]).toBe("object");
@@ -187,16 +168,10 @@ describe("translations", () => {
 		};
 
 		// Function to initialize JSDOM and load translations
-		const initializeTranslationDOM = (language) => {
-			const window = setupDOMEnvironment();
-
-			return new Promise((resolve) => {
-				window.onload = async () => {
-					const { Translator } = window;
-					await Translator.load(mmm, translations[language], false);
-					resolve(Translator.translations[mmm.name]);
-				};
-			});
+		const initializeTranslationDOM = async (language) => {
+			const { Translator } = createTranslationTestEnvironment();
+			await Translator.load(mmm, translations[language], false);
+			return Translator.translations[mmm.name];
 		};
 
 		beforeAll(async () => {

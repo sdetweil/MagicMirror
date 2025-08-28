@@ -111,7 +111,6 @@
 		"markdownlint-cli2": "^0.18.1",
 		"playwright": "^1.55.0",
 		"prettier": "^3.6.2",
-		"sinon": "^21.0.0",
 		"stylelint": "^16.23.1",
 		"stylelint-config-standard": "^39.0.0",
 		"stylelint-prettier": "^5.0.3"

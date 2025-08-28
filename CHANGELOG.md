@@ -27,6 +27,13 @@ Thanks to: @dathbe.
 - [tests] refactor: add `setupDOMEnvironment` helper function to eliminate repetitive JSDOM setup code (#3860)
 - [tests] replace `console` with `Log` in calendar `debug.js` to avoid exception in eslint config (#3846)
 - [tests] speed up e2e tests, cleanup and stabilize weather e2e tests, update snapshot url (#3847, #3848, #3861)
+- [tests] refactor translation tests (#3866)
+  - Remove `sinon` dependency in favor of Jest native mocking
+  - Unify test helper functions across translation test suites
+  - Rename `setupDOMEnvironment` to `createTranslationTestEnvironment` for consistency
+  - Simplify DOM setup by removing unnecessary Promise/async patterns
+  - Avoid potential port conflicts by using port 3001 for translator unit tests
+  - Improve test reliability and maintainability
 
 ### Updated
 

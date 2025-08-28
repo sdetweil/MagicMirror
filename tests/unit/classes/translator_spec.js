@@ -5,25 +5,22 @@ const { JSDOM } = require("jsdom");
 const express = require("express");
 
 /**
- * Helper function to setup DOM environment.
- * @param {string} scriptContent - The script content to evaluate
- * @returns {Promise<object>} The JSDOM window object
+ * Helper function to create a fresh Translator instance with DOM environment.
+ * @returns {object} Object containing window and Translator
  */
-async function setupDOMEnvironment (scriptContent) {
-	const dom = new JSDOM("", { runScripts: "outside-only" });
+function createTranslationTestEnvironment () {
+	const translatorJs = fs.readFileSync(path.join(__dirname, "..", "..", "..", "js", "translator.js"), "utf-8");
+	const dom = new JSDOM("", { url: "http://localhost:3001", runScripts: "outside-only" });
 
-	dom.window.eval(scriptContent);
 	dom.window.Log = { log: jest.fn(), error: jest.fn() };
+	dom.window.eval(translatorJs);
 
-	await new Promise((resolve) => dom.window.onload = resolve);
-	return dom.window;
+	return { window: dom.window, Translator: dom.window.Translator };
 }
 
 describe("Translator", () => {
 	let server;
 	const sockets = new Set();
-	const translatorJsPath = path.join(__dirname, "..", "..", "..", "js", "translator.js");
-	const translatorJsScriptContent = fs.readFileSync(translatorJsPath, "utf8");
 	const translationTestData = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "..", "tests", "mocks", "translation_test.json"), "utf8"));
 
 	beforeAll(() => {
@@ -35,7 +32,7 @@ describe("Translator", () => {
 		});
 		app.use("/translations", express.static(path.join(__dirname, "..", "..", "..", "tests", "mocks")));
 
-		server = app.listen(3000);
+		server = app.listen(3001);
 
 		server.on("connection", (socket) => {
 			sockets.add(socket);
@@ -96,8 +93,7 @@ describe("Translator", () => {
 		};
 
 		it("should return custom module translation", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			setTranslations(Translator);
 
 			let translation = Translator.translate({ name: "MMM-Module" }, "Hello");
@@ -108,8 +104,7 @@ describe("Translator", () => {
 		});
 
 		it("should return core translation", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			setTranslations(Translator);
 			let translation = Translator.translate({ name: "MMM-Module" }, "FOO");
 			expect(translation).toBe("Foo");
@@ -118,32 +113,28 @@ describe("Translator", () => {
 		});
 
 		it("should return custom module translation fallback", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			setTranslations(Translator);
 			const translation = Translator.translate({ name: "MMM-Module" }, "A key");
 			expect(translation).toBe("A translation");
 		});
 
 		it("should return core translation fallback", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			setTranslations(Translator);
 			const translation = Translator.translate({ name: "MMM-Module" }, "Fallback");
 			expect(translation).toBe("core fallback");
 		});
 
 		it("should return translation with placeholder for missing variables", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			setTranslations(Translator);
 			const translation = Translator.translate({ name: "MMM-Module" }, "Hello {username}");
 			expect(translation).toBe("Hallo {username}");
 		});
 
 		it("should return key if no translation was found", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			setTranslations(Translator);
 			const translation = Translator.translate({ name: "MMM-Module" }, "MISSING");
 			expect(translation).toBe("MISSING");
@@ -154,13 +145,12 @@ describe("Translator", () => {
 		const mmm = {
 			name: "TranslationTest",
 			file (file) {
-				return `http://localhost:3000/translations/${file}`;
+				return `http://localhost:3001/translations/${file}`;
 			}
 		};
 
 		it("should load translations", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			const file = "translation_test.json";
 
 			await Translator.load(mmm, file, false);
@@ -169,8 +159,7 @@ describe("Translator", () => {
 		});
 
 		it("should load translation fallbacks", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			const file = "translation_test.json";
 
 			await Translator.load(mmm, file, true);
@@ -179,8 +168,7 @@ describe("Translator", () => {
 		});
 
 		it("should not load translations, if module fallback exists", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			const { Translator } = window;
+			const { Translator } = createTranslationTestEnvironment();
 			const file = "translation_test.json";
 
 			Translator.translationsFallback[mmm.name] = {
@@ -197,28 +185,22 @@ describe("Translator", () => {
 
 	describe("loadCoreTranslations", () => {
 		it("should load core translations and fallback", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			window.translations = { en: "http://localhost:3000/translations/translation_test.json" };
-			const { Translator } = window;
+			const { window, Translator } = createTranslationTestEnvironment();
+			window.translations = { en: "http://localhost:3001/translations/translation_test.json" };
 			await Translator.loadCoreTranslations("en");
 
 			const en = translationTestData;
-
-			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			expect(Translator.coreTranslations).toEqual(en);
 			expect(Translator.coreTranslationsFallback).toEqual(en);
 		});
 
 		it("should load core fallback if language cannot be found", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			window.translations = { en: "http://localhost:3000/translations/translation_test.json" };
-			const { Translator } = window;
+			const { window, Translator } = createTranslationTestEnvironment();
+			window.translations = { en: "http://localhost:3001/translations/translation_test.json" };
 			await Translator.loadCoreTranslations("MISSINGLANG");
 
 			const en = translationTestData;
-
-			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			expect(Translator.coreTranslations).toEqual({});
 			expect(Translator.coreTranslationsFallback).toEqual(en);
@@ -227,25 +209,19 @@ describe("Translator", () => {
 
 	describe("loadCoreTranslationsFallback", () => {
 		it("should load core translations fallback", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
-			window.translations = { en: "http://localhost:3000/translations/translation_test.json" };
-			const { Translator } = window;
+			const { window, Translator } = createTranslationTestEnvironment();
+			window.translations = { en: "http://localhost:3001/translations/translation_test.json" };
 			await Translator.loadCoreTranslationsFallback();
 
 			const en = translationTestData;
-
-			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			expect(Translator.coreTranslationsFallback).toEqual(en);
 		});
 
 		it("should load core fallback if language cannot be found", async () => {
-			const window = await setupDOMEnvironment(translatorJsScriptContent);
+			const { window, Translator } = createTranslationTestEnvironment();
 			window.translations = {};
-			const { Translator } = window;
 			await Translator.loadCoreTranslations();
-
-			await new Promise((resolve) => setTimeout(resolve, 500));
 
 			expect(Translator.coreTranslationsFallback).toEqual({});
 		});
