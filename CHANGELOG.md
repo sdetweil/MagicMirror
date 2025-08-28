@@ -39,6 +39,7 @@ Thanks to: @dathbe.
 - [weather] Fixed handling of empty values in weathergov providers handling of precipitationAmount (#3859)
 - [calendar] Fix regression handling of limit days (#3840)
 - [calendar] Fixed regression of calendarfetcherutils.shouldEventBeExcluded (#3841)
+- [core] Fixed socket.io timeout when server is slow to send notification, notification lost at client (#3380)
 
 ## [2.32.0] - 2025-07-01
 
