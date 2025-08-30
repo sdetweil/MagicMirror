@@ -13,7 +13,7 @@ WeatherProvider.register("openmeteo", {
 
 	/*
 	 * Set the name of the provider.
-	 * Not strictly required, but helps for debugging.
+	 * Not strictly required but helps for debugging.
 	 */
 	providerName: "Open-Meteo",
 
@@ -348,7 +348,7 @@ WeatherProvider.register("openmeteo", {
 	generateWeatherDayFromCurrentWeather (weather) {
 
 		/**
-		 * Since some units comes from API response "splitted" into daily, hourly and current_weather
+		 * Since some units come from API response "splitted" into daily, hourly and current_weather
 		 * every time you request it, you have to ensure to get the data from the right place every time.
 		 * For the current weather case, the response have the following structure (after transposing):
 		 * ```
@@ -381,6 +381,7 @@ WeatherProvider.register("openmeteo", {
 		currentWeather.maxTemperature = parseFloat(weather.daily[0].temperature_2m_max);
 		currentWeather.weatherType = this.convertWeatherType(weather.current_weather.weathercode, currentWeather.isDayTime());
 		currentWeather.humidity = parseFloat(weather.hourly[h].relativehumidity_2m);
+		currentWeather.feelsLikeTemp = parseFloat(weather.hourly[h].apparent_temperature);
 		currentWeather.rain = parseFloat(weather.hourly[h].rain);
 		currentWeather.snow = parseFloat(weather.hourly[h].snowfall * 10);
 		currentWeather.precipitationAmount = parseFloat(weather.hourly[h].precipitation);
