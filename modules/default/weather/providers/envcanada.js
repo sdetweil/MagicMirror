@@ -24,6 +24,8 @@
  * with locations you can search under column B (English Names), with the corresponding siteCode under
  * column A (Codes) and provCode under column C (Province).
  *
+ * Acknowledgement: Some logic and code for parsing Environment Canada web pages is based on material from MMM-EnvCanada
+ *
  * License to use Environment Canada (EC) data is detailed here:
  * 	https://eccc-msc.github.io/open-data/licence/readme_en/
  */
@@ -49,6 +51,9 @@ WeatherProvider.register("envcanada", {
 		this.todayTempCacheMax = 0;
 		this.todayCached = false;
 		this.cacheCurrentTemp = 999;
+		this.lastCityPageCurrent = " ";
+		this.lastCityPageForecast = " ";
+		this.lastCityPageHourly = " ";
 	},
 
 	/*
@@ -63,69 +68,158 @@ WeatherProvider.register("envcanada", {
 	 * Override the fetchCurrentWeather method to query EC and construct a Current weather object
 	 */
 	fetchCurrentWeather () {
-		this.fetchData(this.getUrl(), "xml")
-			.then((data) => {
-				if (!data) {
-					// Did not receive usable new data.
-					return;
-				}
-				const currentWeather = this.generateWeatherObjectFromCurrentWeather(data);
-
-				this.setCurrentWeather(currentWeather);
-			})
-			.catch(function (request) {
-				Log.error("Could not load EnvCanada site data ... ", request);
-			})
-			.finally(() => this.updateAvailable());
+		this.fetchCommon("Current");
 	},
 
 	/*
-	 * Override the fetchWeatherForecast method to query EC and construct Forecast weather objects
+	 * Override the fetchWeatherForecast method to query EC and construct Forecast/Daily weather objects
 	 */
 	fetchWeatherForecast () {
-		this.fetchData(this.getUrl(), "xml")
-			.then((data) => {
-				if (!data) {
-					// Did not receive usable new data.
-					return;
-				}
-				const forecastWeather = this.generateWeatherObjectsFromForecast(data);
 
-				this.setWeatherForecast(forecastWeather);
-			})
-			.catch(function (request) {
-				Log.error("Could not load EnvCanada forecast data ... ", request);
-			})
-			.finally(() => this.updateAvailable());
+		this.fetchCommon("Forecast");
+
 	},
 
 	/*
-	 * Override the fetchWeatherHourly method to query EC and construct Forecast weather objects
+	 * Override the fetchWeatherHourly method to query EC and construct Hourly weather objects
 	 */
 	fetchWeatherHourly () {
-		this.fetchData(this.getUrl(), "xml")
-			.then((data) => {
-				if (!data) {
-					// Did not receive usable new data.
-					return;
-				}
-				const hourlyWeather = this.generateWeatherObjectsFromHourly(data);
-
-				this.setWeatherHourly(hourlyWeather);
-			})
-			.catch(function (request) {
-				Log.error("Could not load EnvCanada hourly data ... ", request);
-			})
-			.finally(() => this.updateAvailable());
+		this.fetchCommon("Hourly");
 	},
 
 	/*
-	 * Build the EC URL based on the Site Code and Province Code specified in the config params. Note that the
-	 * URL defaults to the English version simply because there is no language dependency in the data
-	 * being accessed. This is only pertinent when using the EC data elements that contain a textual forecast.
+	 * Because the process to fetch weather data is virtually the same for Current, Forecast/Daily, and Hourly weather,
+	 * a common module is used to access the EC weather data. The only customization (based on the caller of this routine)
+	 * is how the data will be parsed to satisfy the Weather module config in Config.js
+	 *
+	 * Accessing EC weather data is accomplished in 2 steps:
+	 *
+	 * 1. Query the MSC Datamart Index page, which returns a list of all the filenames for all the cities that have
+	 *    weather data currently available.
+	 *
+	 * 2. With the city filename identified, build the appropriate URL and get the weather data (XML document) for the
+	 *    city specified in the Weather module Config information
+	 */
+	fetchCommon (target) {
+		const forecastURL = this.getUrl(); // Get the approriate URL for the MSC Datamart Index page
+
+		Log.debug(`[weather.envcanada] ${target} Index url: ${forecastURL}`);
+
+		this.fetchData(forecastURL, "xml") // Query the Index page URL
+			.then((indexData) => {
+				if (!indexData) {
+					// Did not receive usable new data.
+					Log.info(`weather.envcanada ${target} - did not receive usable index data`);
+					this.updateAvailable(); // If there were issues, update anyways to reset timer
+					return;
+				}
+
+				/**
+				 * With the Index page read, we must locate the filename/link for the specified city (aka Sitecode).
+				 * This is done by building the city filename and searching for it on the Index page. Once found,
+				 * extract the full filename (a unique name that includes dat/time, filename, etc.) and then add it
+				 * to the Index page URL to create the proper URL pointing to the city's weather data. Finally, read the
+				 * URL to pull in the city's XML document so that weather data can be parsed and displayed.
+				 */
+
+				let forecastFile = "";
+				let forecastFileURL = "";
+				const fileSuffix = `${this.config.siteCode}_en.xml`; // Build city filename
+				const nextFile = indexData.body.innerHTML.split(fileSuffix); // Find filename on Index page
+
+				if (nextFile.length > 1) { // Parse out the full unqiue file city filename
+					// Find the last occurrence
+					forecastFile = nextFile[nextFile.length - 2].slice(-41) + fileSuffix;
+					forecastFileURL = forecastURL + forecastFile; // Create full URL to the city's weather data
+				}
+
+				Log.debug(`[weather.envcanada] ${target} Citypage url: ${forecastFileURL}`);
+
+				/*
+				 * If the Citypage filename has not changed since the last Weather refresh, the forecast has not changed and
+				 * and therefore we can skip reading the Citypage URL.
+				 */
+
+				if (target === "Current" && this.lastCityPageCurrent === forecastFileURL) {
+					Log.debug(`[weather.envcanada] ${target} - Newest Citypage has already been seen - skipping!`);
+					this.updateAvailable(); // Update anyways to reset refresh timer
+					return;
+				}
+
+				if (target === "Forecast" && this.lastCityPageForecast === forecastFileURL) {
+					Log.debug(`[weather.envcanada] ${target} - Newest Citypage has already been seen - skipping!`);
+					this.updateAvailable(); // Update anyways to reset refresh timer
+					return;
+				}
+
+				if (target === "Hourly" && this.lastCityPageHourly === forecastFileURL) {
+					Log.debug(`[weather.envcanada] ${target} - Newest Citypage has already been seen - skipping!`);
+					this.updateAvailable(); // Update anyways to reset refresh timer
+					return;
+				}
+
+				this.fetchData(forecastFileURL, "xml") // Read city's URL to get weather data
+					.then((cityData) => {
+						if (!cityData) {
+							// Did not receive usable new data.
+							Log.info(`weather.envcanada ${target} - did not receive usable citypage data`);
+							return;
+						}
+
+						/*
+						 * With the city's weather data read, parse the resulting XML document for the appropriate weather data
+						 * elements to create a weather object. Next, set Weather modules details from that object.
+						 */
+						Log.debug(`[weather.envcanada] ${target} - Citypage has been read and will be processed for updates`);
+
+						if (target === "Current") {
+							const currentWeather = this.generateWeatherObjectFromCurrentWeather(cityData);
+							this.setCurrentWeather(currentWeather);
+							this.lastCityPageCurrent = forecastFileURL;
+						}
+
+						if (target === "Forecast") {
+							const forecastWeather = this.generateWeatherObjectsFromForecast(cityData);
+							this.setWeatherForecast(forecastWeather);
+							this.lastCityPageForecast = forecastFileURL;
+						}
+
+						if (target === "Hourly") {
+							const hourlyWeather = this.generateWeatherObjectsFromHourly(cityData);
+							this.setWeatherHourly(hourlyWeather);
+							this.lastCityPageHourly = forecastFileURL;
+						}
+					})
+					.catch(function (cityRequest) {
+						Log.info(`weather.envcanada ${target} - could not load citypage data from: ${forecastFileURL}`);
+					})
+					.finally(() => this.updateAvailable()); // Update no matter what to reset weather refresh timer
+			})
+			.catch(function (indexRequest) {
+				Log.error(`weather.envcanada ${target} - could not load index data ... `, indexRequest);
+				this.updateAvailable(); // If there were issues, update anyways to reset timer
+			});
+	},
+
+	/*
+	 * Build the EC Index page URL based on current GMT hour. The Index page will provide a list of links for each city
+	 * that will, in turn, provide actual weather data. The URL is comprised of 3 parts:
+	 *
+	 *   Fixed value + Prov code specified in Weather module Config.js + current hour as GMT
 	 */
 	getUrl () {
-		return `https://dd.weather.gc.ca/citypage_weather/xml/${this.config.provCode}/${this.config.siteCode}_e.xml`;
+		let forecastURL = `https://dd.weather.gc.ca/citypage_weather/${this.config.provCode}`;
+		const hour = this.getCurrentHourGMT();
+		forecastURL += `/${hour}/`;
+		return forecastURL;
+	},
+
+	/*
+	 * Get current hour-of-day in GMT context
+	 */
+	getCurrentHourGMT () {
+		const now = new Date();
+		return now.toISOString().substring(11, 13); // "HH" in GMT
 	},
 
 	/*
@@ -151,7 +245,6 @@ WeatherProvider.register("envcanada", {
 		}
 
 		currentWeather.windSpeed = WeatherUtils.convertWindToMs(ECdoc.querySelector("siteData currentConditions wind speed").textContent);
-
 		currentWeather.windFromDirection = ECdoc.querySelector("siteData currentConditions wind bearing").textContent;
 
 		currentWeather.humidity = ECdoc.querySelector("siteData currentConditions relativeHumidity").textContent;
@@ -214,7 +307,7 @@ WeatherProvider.register("envcanada", {
 		/*
 		 * The EC forecast is held in a 12-element array - Elements 0 to 11 - with each day encompassing
 		 * 2 elements. the first element for a day details the Today (daytime) forecast while the second
-		 * element details the Tonight (nightime) forecast. Element 0 is always for the current day.
+		 * element details the Tonight (nighttime) forecast. Element 0 is always for the current day.
 		 *
 		 * However... the forecast is somewhat 'rolling'.
 		 *
@@ -225,7 +318,7 @@ WeatherProvider.register("envcanada", {
 		 *
 		 * But, if the EC forecast is queried in late afternoon, the Current Today forecast will be rolled
 		 * off and Element 0 will contain Current Tonight. From there, the next 5 days will be contained in
-		 * Elements 1/2, 3/4, 5/6, 7/8, and 9/10. As well, Elelement 11 will contain a forecast for a 6th day,
+		 * Elements 1/2, 3/4, 5/6, 7/8, and 9/10. As well, Element 11 will contain a forecast for a 6th day,
 		 * but only for the Today portion (not Tonight). This module will create a 6-day forecast using
 		 * Elements 0 to 11, and will ignore the additional Todat forecast in Element 11.
 		 *
@@ -436,17 +529,17 @@ WeatherProvider.register("envcanada", {
 	 * then it will be displayed ONLY if no POP is present.
 	 *
 	 * POP Logic: By default, we want to show the POP for 'daytime' since we are presuming that is what
-	 * people are more interested in seeing. While EC provides a separate POP for daytime and nightime portions
+	 * people are more interested in seeing. While EC provides a separate POP for daytime and nighttime portions
 	 * of each day, the weather module does not really allow for that view of a daily forecast. There we will
-	 * ignore any nightime portion. There is an exception however! For the Current day, the EC data will only show
-	 * the nightime forecast after a certain point in the afternoon. As such, we will be showing the nightime POP
+	 * ignore any nighttime portion. There is an exception however! For the Current day, the EC data will only show
+	 * the nighttime forecast after a certain point in the afternoon. As such, we will be showing the nighttime POP
 	 * (if one exists) in that specific scenario.
 	 *
 	 * Accumulation Logic: Similar to POP, we want to show accumulation for 'daytime' since we presume that is what
-	 * people are interested in seeing. While EC provides a separate accumulation for daytime and nightime portions
+	 * people are interested in seeing. While EC provides a separate accumulation for daytime and nighttime portions
 	 * of each day, the weather module does not really allow for that view of a daily forecast. There we will
-	 * ignore any nightime portion. There is an exception however! For the Current day, the EC data will only show
-	 * the nightime forecast after a certain point in that specific scenario.
+	 * ignore any nighttime portion. There is an exception however! For the Current day, the EC data will only show
+	 * the nighttime forecast after a certain point in that specific scenario.
 	 */
 	setPrecipitation (weather, foreGroup, today) {
 		if (foreGroup[today].querySelector("precipitation accumulation")) {
