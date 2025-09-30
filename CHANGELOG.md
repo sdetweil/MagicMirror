@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ❤️ **Donate:** Enjoying MagicMirror²? [Please consider a donation!](https://magicmirror.builders/#donate) With your help we can continue to improve the MagicMirror².
 
+## [2.34.0] - unreleased
+
+planned for 2026-01-01
+
+### Added
+
+### Changed
+
+### Fixed
+
+### Updated
+
 ## [2.33.0] - 2025-10-01
 
 Thanks to: @Crazylegstoo, @dathbe, @m-idler, @plebcity, @khassel, @KristjanESPERANTO, @rejas and @sdetweil!
@@ -1824,6 +1836,7 @@ It includes (but is not limited to) the following features:
 
 This was part of the blogpost: [https://michaelteeuw.nl/post/83916869600/magic-mirror-part-vi-production-of-the](https://michaelteeuw.nl/post/83916869600/magic-mirror-part-vi-production-of-the)
 
+[2.34.0]: https://github.com/MagicMirrorOrg/MagicMirror/compare/v2.33.0...develop
 [2.33.0]: https://github.com/MagicMirrorOrg/MagicMirror/compare/v2.32.0...v2.33.0
 [2.32.0]: https://github.com/MagicMirrorOrg/MagicMirror/compare/v2.31.0...v2.32.0
 [2.31.0]: https://github.com/MagicMirrorOrg/MagicMirror/compare/v2.30.0...v2.31.0
