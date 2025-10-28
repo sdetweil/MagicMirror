@@ -176,4 +176,22 @@ function getEnvVars (req, res) {
 	res.send(obj);
 }
 
-module.exports = { cors, getConfig, getHtml, getVersion, getStartup, getEnvVars, getEnvVarsAsObj, getUserAgent };
+/**
+ * Get the config file path from environment or default location
+ * @returns {string} The absolute config file path
+ */
+function getConfigFilePath () {
+	// Ensure root_path is set (for standalone contexts like watcher)
+	if (!global.root_path) {
+		global.root_path = path.resolve(`${__dirname}/../`);
+	}
+
+	// Check environment variable if global not set
+	if (!global.configuration_file && process.env.MM_CONFIG_FILE) {
+		global.configuration_file = process.env.MM_CONFIG_FILE;
+	}
+
+	return path.resolve(global.configuration_file || `${global.root_path}/config/config.js`);
+}
+
+module.exports = { cors, getConfig, getHtml, getVersion, getStartup, getEnvVars, getEnvVarsAsObj, getUserAgent, getConfigFilePath };
