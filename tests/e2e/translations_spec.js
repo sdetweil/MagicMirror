@@ -14,7 +14,7 @@ function createTranslationTestEnvironment () {
 	const translatorJs = fs.readFileSync(path.join(__dirname, "..", "..", "js", "translator.js"), "utf-8");
 	const dom = new JSDOM("", { url: "http://localhost:3000", runScripts: "outside-only" });
 
-	dom.window.Log = { log: jest.fn(), error: jest.fn() };
+	dom.window.Log = { log: vi.fn(), error: vi.fn() };
 	dom.window.translations = translations;
 	dom.window.eval(translatorJs);
 
@@ -75,7 +75,7 @@ describe("translations", () => {
 		it("should load translation file", async () => {
 			const { Translator, Module, config } = dom.window;
 			config.language = "en";
-			Translator.load = jest.fn().mockImplementation((_m, _f, _fb) => null);
+			Translator.load = vi.fn().mockImplementation((_m, _f, _fb) => null);
 
 			Module.register("name", { getTranslations: () => translations });
 			const MMM = Module.create("name");
@@ -88,7 +88,7 @@ describe("translations", () => {
 
 		it("should load translation + fallback file", async () => {
 			const { Translator, Module } = dom.window;
-			Translator.load = jest.fn().mockImplementation((_m, _f, _fb) => null);
+			Translator.load = vi.fn().mockImplementation((_m, _f, _fb) => null);
 
 			Module.register("name", { getTranslations: () => translations });
 			const MMM = Module.create("name");
@@ -103,7 +103,7 @@ describe("translations", () => {
 		it("should load translation fallback file", async () => {
 			const { Translator, Module, config } = dom.window;
 			config.language = "--";
-			Translator.load = jest.fn().mockImplementation((_m, _f, _fb) => null);
+			Translator.load = vi.fn().mockImplementation((_m, _f, _fb) => null);
 
 			Module.register("name", { getTranslations: () => translations });
 			const MMM = Module.create("name");
@@ -116,7 +116,7 @@ describe("translations", () => {
 
 		it("should load no file", async () => {
 			const { Translator, Module } = dom.window;
-			Translator.load = jest.fn();
+			Translator.load = vi.fn();
 
 			Module.register("name", {});
 			const MMM = Module.create("name");

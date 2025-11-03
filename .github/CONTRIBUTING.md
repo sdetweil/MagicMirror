@@ -30,9 +30,19 @@ To run markdownlint, use `node --run lint:markdown`.
 
 ## Testing
 
-We use [Jest](https://jestjs.io) for JavaScript testing.
+We use [Vitest](https://vitest.dev) for JavaScript testing.
 
 To run all tests, use `node --run test`.
 
-The specific test commands are defined in `package.json`.
-So you can also run the specific tests with other commands, e.g. `node --run test:unit` or `npx jest tests/e2e/env_spec.js`.
+The `package.json` scripts expose finer-grained test commands:
+
+- `test:unit` – run unit tests only
+- `test:e2e` – execute browser-driven end-to-end tests
+- `test:electron` – launch the Electron-based regression suite
+- `test:coverage` – collect coverage while running every suite
+- `test:watch` – keep Vitest in watch mode for fast local feedback
+- `test:ui` – open the Vitest UI dashboard (needs OS file-watch support enabled)
+- `test:calendar` – run the legacy calendar debug helper
+- `test:css`, `test:markdown`, `test:prettier`, `test:spelling`, `test:js` – lint-only scripts that enforce formatting, spelling, markdown style, and ESLint.
+
+You can invoke any script with `node --run <script>` (or `npm run <script>`). Individual files can still be targeted directly, e.g. `npx vitest run tests/e2e/env_spec.js`.

@@ -1,7 +1,7 @@
 // This logger is very simple, but needs to be extended.
 (function (root, factory) {
 	if (typeof exports === "object") {
-		if (process.env.JEST_WORKER_ID === undefined) {
+		if (process.env.mmTestMode !== "true") {
 			const { styleText } = require("node:util");
 
 			// add timestamps in front of log messages
@@ -78,8 +78,8 @@
 	let logLevel;
 	let enableLog;
 	if (typeof exports === "object") {
-		// in nodejs and not running with jest
-		enableLog = process.env.JEST_WORKER_ID === undefined;
+		// in nodejs and not running in test mode
+		enableLog = process.env.mmTestMode !== "true";
 	} else {
 		// in browser and not running with jsdom
 		enableLog = typeof window === "object" && window.name !== "jsdom";
@@ -97,7 +97,7 @@
 			groupEnd: Function.prototype.bind.call(console.groupEnd, console),
 			time: Function.prototype.bind.call(console.time, console),
 			timeEnd: Function.prototype.bind.call(console.timeEnd, console),
-			timeStamp: Function.prototype.bind.call(console.timeStamp, console)
+			timeStamp: console.timeStamp ? Function.prototype.bind.call(console.timeStamp, console) : function () {}
 		};
 
 		logLevel.setLogLevel = function (newLevel) {

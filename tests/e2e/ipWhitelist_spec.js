@@ -10,7 +10,8 @@ describe("ipWhitelist directive configuration", () => {
 		});
 
 		it("should reject request with 403 (Forbidden)", async () => {
-			const res = await fetch("http://localhost:8181");
+			const port = global.testPort || 8080;
+			const res = await fetch(`http://localhost:${port}`);
 			expect(res.status).toBe(403);
 		});
 	});
@@ -24,7 +25,8 @@ describe("ipWhitelist directive configuration", () => {
 		});
 
 		it("should allow request with 200 (OK)", async () => {
-			const res = await fetch("http://localhost:8282");
+			const port = global.testPort || 8080;
+			const res = await fetch(`http://localhost:${port}`);
 			expect(res.status).toBe(200);
 		});
 	});

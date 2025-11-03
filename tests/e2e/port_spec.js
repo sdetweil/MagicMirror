@@ -10,7 +10,8 @@ describe("port directive configuration", () => {
 		});
 
 		it("should return 200", async () => {
-			const res = await fetch("http://localhost:8090");
+			const port = global.testPort || 8080;
+			const res = await fetch(`http://localhost:${port}`);
 			expect(res.status).toBe(200);
 		});
 	});
@@ -24,7 +25,8 @@ describe("port directive configuration", () => {
 		});
 
 		it("should return 200", async () => {
-			const res = await fetch("http://localhost:8100");
+			const port = global.testPort || 8080;
+			const res = await fetch(`http://localhost:${port}`);
 			expect(res.status).toBe(200);
 		});
 	});

@@ -5,8 +5,8 @@
  * @param {Promise} callback function to call when the timer expires
  */
 const scheduleTimer = function (timer, intervalMS, callback) {
-	if (process.env.JEST_WORKER_ID === undefined) {
-		// only set timer when not running in jest
+	if (process.env.mmTestMode !== "true") {
+		// only set timer when not running in test mode
 		let tmr = timer;
 		clearTimeout(tmr);
 		tmr = setTimeout(function () {

@@ -12,7 +12,7 @@ describe("Default modules utils tests", () => {
 
 		beforeEach(() => {
 			fetchResponse = new Response();
-			global.fetch = jest.fn(() => Promise.resolve(fetchResponse));
+			global.fetch = vi.fn(() => Promise.resolve(fetchResponse));
 			fetchMock = global.fetch;
 		});
 

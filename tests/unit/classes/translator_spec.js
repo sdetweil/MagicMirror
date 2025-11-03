@@ -12,7 +12,7 @@ function createTranslationTestEnvironment () {
 	const translatorJs = fs.readFileSync(path.join(__dirname, "..", "..", "..", "js", "translator.js"), "utf-8");
 	const dom = new JSDOM("", { url: "http://localhost:3001", runScripts: "outside-only" });
 
-	dom.window.Log = { log: jest.fn(), error: jest.fn() };
+	dom.window.Log = { log: vi.fn(), error: vi.fn() };
 	dom.window.eval(translatorJs);
 
 	return { window: dom.window, Translator: dom.window.Translator };

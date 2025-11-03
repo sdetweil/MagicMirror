@@ -1,11 +1,11 @@
 import {defineConfig, globalIgnores} from "eslint/config";
 import globals from "globals";
 import {flatConfigs as importX} from "eslint-plugin-import-x";
-import jest from "eslint-plugin-jest";
 import js from "@eslint/js";
 import jsdocPlugin from "eslint-plugin-jsdoc";
 import packageJson from "eslint-plugin-package-json";
 import stylistic from "@stylistic/eslint-plugin";
+import vitest from "eslint-plugin-vitest";
 
 export default defineConfig([
 	globalIgnores(["config/**", "modules/**/*", "!modules/default/**", "js/positions.js"]),
@@ -16,6 +16,7 @@ export default defineConfig([
 			globals: {
 				...globals.browser,
 				...globals.node,
+				...vitest.environments.env.globals,
 				Log: "readonly",
 				MM: "readonly",
 				Module: "readonly",
@@ -23,8 +24,8 @@ export default defineConfig([
 				moment: "readonly"
 			}
 		},
-		plugins: {js, stylistic},
-		extends: [importX.recommended, jest.configs["flat/recommended"], "js/recommended", jsdocPlugin.configs["flat/recommended"], "stylistic/all"],
+		plugins: {js, stylistic, vitest},
+		extends: [importX.recommended, vitest.configs.recommended, "js/recommended", jsdocPlugin.configs["flat/recommended"], "stylistic/all"],
 		rules: {
 			"@stylistic/array-element-newline": ["error", "consistent"],
 			"@stylistic/arrow-parens": ["error", "always"],
@@ -57,12 +58,9 @@ export default defineConfig([
 			"import-x/newline-after-import": "error",
 			"import-x/order": "error",
 			"init-declarations": "off",
-			"jest/consistent-test-it": "warn",
-			"jest/no-done-callback": "warn",
-			"jest/prefer-expect-resolves": "warn",
-			"jest/prefer-mock-promise-shorthand": "warn",
-			"jest/prefer-to-be": "warn",
-			"jest/prefer-to-have-length": "warn",
+			"vitest/consistent-test-it": "warn",
+			"vitest/prefer-to-be": "warn",
+			"vitest/prefer-to-have-length": "warn",
 			"max-lines-per-function": ["warn", 400],
 			"max-statements": "off",
 			"no-global-assign": "off",

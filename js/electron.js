@@ -76,8 +76,8 @@ function createWindow () {
 
 	const electronOptions = Object.assign({}, electronOptionsDefaults, config.electronOptions);
 
-	if (process.env.JEST_WORKER_ID !== undefined && process.env.MOCK_DATE !== undefined) {
-		// if we are running with jest and we want to mock the current date
+	if (process.env.MOCK_DATE !== undefined) {
+		// if we are running tests and we want to mock the current date
 		const fakeNow = new Date(process.env.MOCK_DATE).valueOf();
 		Date = class extends Date {
 			constructor (...args) {
@@ -114,8 +114,8 @@ function createWindow () {
 
 	// Open the DevTools if run with "node --run start:dev"
 	if (process.argv.includes("dev")) {
-		if (process.env.JEST_WORKER_ID !== undefined) {
-			// if we are running with jest
+		if (process.env.mmTestMode) {
+			// if we are running tests
 			const devtools = new BrowserWindow(electronOptions);
 			mainWindow.webContents.setDevToolsWebContents(devtools.webContents);
 		}
@@ -169,8 +169,8 @@ function createWindow () {
 
 // Quit when all windows are closed.
 app.on("window-all-closed", function () {
-	if (process.env.JEST_WORKER_ID !== undefined) {
-		// if we are running with jest
+	if (process.env.mmTestMode) {
+		// if we are running tests
 		app.quit();
 	} else {
 		createWindow();

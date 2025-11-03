@@ -84,7 +84,7 @@ const Loader = (function () {
 				if (window.name !== "jsdom") {
 					moduleFolder = defaultModuleFolder;
 				} else {
-					// running in Jest, allow defaultModules placed under moduleDir for testing
+					// running in test mode, allow defaultModules placed under moduleDir for testing
 					if (envVars.modulesDir === "modules") {
 						moduleFolder = defaultModuleFolder;
 					}

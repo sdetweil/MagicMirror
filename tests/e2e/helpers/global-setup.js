@@ -20,16 +20,41 @@ var indexData = [];
 var cssData = [];
 
 exports.startApplication = async (configFilename, exec) => {
-	jest.resetModules();
+	vi.resetModules();
+
+	// Clear Node's require cache for config and app files to prevent stale configs and middlewares
+	Object.keys(require.cache).forEach((key) => {
+		if (
+			key.includes("/tests/configs/")
+			|| key.includes("/config/config")
+			|| key.includes("/js/app.js")
+			|| key.includes("/js/server.js")
+		) {
+			delete require.cache[key];
+		}
+	});
+
 	if (global.app) {
 		await this.stopApplication();
 	}
+
+	// Use fixed port 8080 (tests run sequentially, no conflicts)
+	const port = 8080;
+	global.testPort = port;
+
 	// Set config sample for use in test
+	let configPath;
 	if (configFilename === "") {
-		process.env.MM_CONFIG_FILE = "config/config.js";
+		configPath = "config/config.js";
 	} else {
-		process.env.MM_CONFIG_FILE = configFilename;
+		configPath = configFilename;
 	}
+
+	process.env.MM_CONFIG_FILE = configPath;
+
+	// Override port in config - MUST be set before app loads
+	process.env.MM_PORT = port.toString();
+
 	process.env.mmTestMode = "true";
 	process.setMaxListeners(0);
 	if (exec) exec;
@@ -38,24 +63,30 @@ exports.startApplication = async (configFilename, exec) => {
 	return global.app.start();
 };
 
-exports.stopApplication = async (waitTime = 10) => {
+exports.stopApplication = async (waitTime = 100) => {
 	if (global.window) {
-		// no closing causes jest errors and memory leaks
+		// no closing causes test errors and memory leaks
 		global.window.close();
 		delete global.window;
-		// give above closing some extra time to finish
-		await new Promise((resolve) => setTimeout(resolve, waitTime));
 	}
+
 	if (!global.app) {
+		delete global.testPort;
 		return Promise.resolve();
 	}
+
 	await global.app.stop();
 	delete global.app;
+	delete global.testPort;
+
+	// Small delay to ensure clean shutdown
+	await new Promise((resolve) => setTimeout(resolve, waitTime));
 };
 
 exports.getDocument = () => {
 	return new Promise((resolve) => {
-		const url = `http://${config.address || "localhost"}:${config.port || "8080"}`;
+		const port = global.testPort || config.port || 8080;
+		const url = `http://${config.address || "localhost"}:${port}`;
 		jsdom.JSDOM.fromURL(url, { resources: "usable", runScripts: "dangerously" }).then((dom) => {
 			dom.window.name = "jsdom";
 			global.window = dom.window;

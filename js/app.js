@@ -65,8 +65,8 @@ function App () {
 	async function loadConfig () {
 		Log.log("Loading config ...");
 		const defaults = require(`${__dirname}/defaults`);
-		if (process.env.JEST_WORKER_ID !== undefined) {
-			// if we are running with jest
+		if (global.mmTestMode) {
+			// if we are running in test mode
 			defaults.address = "0.0.0.0";
 		}
 
@@ -185,10 +185,10 @@ function App () {
 
 		if (defaultModules.includes(moduleName)) {
 			const defaultModuleFolder = path.resolve(`${global.root_path}/modules/default/`, module);
-			if (process.env.JEST_WORKER_ID === undefined) {
+			if (!global.mmTestMode) {
 				moduleFolder = defaultModuleFolder;
 			} else {
-				// running in Jest, allow defaultModules placed under moduleDir for testing
+				// running in test mode, allow defaultModules placed under moduleDir for testing
 				if (env.modulesDir === "modules" || env.modulesDir === "tests/mocks") {
 					moduleFolder = defaultModuleFolder;
 				}

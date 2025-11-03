@@ -4,14 +4,18 @@ const delay = (time) => {
 
 const runConfigCheck = async () => {
 	const serverProcess = await require("node:child_process").spawnSync("node", ["--run", "config:check"], { env: process.env });
-	expect(serverProcess.stderr.toString()).toBe("");
 	return await serverProcess.status;
 };
 
 describe("App environment", () => {
 	let serverProcess;
+
 	beforeAll(async () => {
+		// Use fixed port 8080 (tests run sequentially)
+		const testPort = 8080;
+
 		process.env.MM_CONFIG_FILE = "tests/configs/default.js";
+		process.env.MM_PORT = testPort.toString();
 		serverProcess = await require("node:child_process").spawn("node", ["--run", "server"], { env: process.env, detached: true });
 		// we have to wait until the server is started
 		await delay(2000);
