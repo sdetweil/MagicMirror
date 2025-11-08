@@ -32,6 +32,8 @@ planned for 2026-01-01
 - [tests] replace `node-libgpiod` with `serialport` in electron-rebuild workflow (#3945)
 - [calendar] hide repeatingCountTitle if the event count is zero (#3949)
 - [core] configure cspell to check default modules only and fix typos (#3955)
+- [core] refactor: replace `XMLHttpRequest` with `fetch` in `translator.js` (#3950)
+- [tests] migrate e2e tests to Playwright (#3950)
 
 ### Fixed
 

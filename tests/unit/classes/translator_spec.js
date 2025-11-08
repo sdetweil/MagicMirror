@@ -13,6 +13,7 @@ function createTranslationTestEnvironment () {
 	const dom = new JSDOM("", { url: "http://localhost:3001", runScripts: "outside-only" });
 
 	dom.window.Log = { log: vi.fn(), error: vi.fn() };
+	dom.window.fetch = fetch;
 	dom.window.eval(translatorJs);
 
 	return { window: dom.window, Translator: dom.window.Translator };

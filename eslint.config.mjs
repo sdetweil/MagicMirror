@@ -4,6 +4,7 @@ import {flatConfigs as importX} from "eslint-plugin-import-x";
 import js from "@eslint/js";
 import jsdocPlugin from "eslint-plugin-jsdoc";
 import packageJson from "eslint-plugin-package-json";
+import playwright from "eslint-plugin-playwright";
 import stylistic from "@stylistic/eslint-plugin";
 import vitest from "eslint-plugin-vitest";
 
@@ -59,6 +60,20 @@ export default defineConfig([
 			"import-x/order": "error",
 			"init-declarations": "off",
 			"vitest/consistent-test-it": "warn",
+			"vitest/expect-expect": [
+				"warn",
+				{
+					assertFunctionNames: [
+						"expect",
+						"testElementLength",
+						"testTextContain",
+						"doTest",
+						"runAnimationTest",
+						"waitForAnimationClass",
+						"assertNoAnimationWithin"
+					]
+				}
+			],
 			"vitest/prefer-to-be": "warn",
 			"vitest/prefer-to-have-length": "warn",
 			"max-lines-per-function": ["warn", 400],
@@ -124,6 +139,13 @@ export default defineConfig([
 		files: ["tests/configs/modules/weather/*.js"],
 		rules: {
 			"@stylistic/quotes": "off"
+		}
+	},
+	{
+		files: ["tests/e2e/**/*.js"],
+		extends: [playwright.configs["flat/recommended"]],
+		rules: {
+			"playwright/no-standalone-expect": "off"
 		}
 	}
 ]);

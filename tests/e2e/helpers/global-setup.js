@@ -1,7 +1,7 @@
 const path = require("node:path");
 const os = require("node:os");
 const fs = require("node:fs");
-const jsdom = require("jsdom");
+const { chromium } = require("playwright");
 
 // global absolute root path
 global.root_path = path.resolve(`${__dirname}/../../../`);
@@ -16,8 +16,67 @@ const sampleCss = [
 	" top: 100%;",
 	"}"
 ];
-var indexData = [];
-var cssData = [];
+let indexData = "";
+let cssData = "";
+
+let browser;
+let context;
+let page;
+
+/**
+ * Ensure Playwright browser and context are available.
+ * @returns {Promise<void>}
+ */
+async function ensureContext () {
+	if (!browser) {
+		browser = await chromium.launch({ headless: true });
+	}
+	if (!context) {
+		context = await browser.newContext();
+	}
+}
+
+/**
+ * Open a fresh page pointing to the provided url.
+ * @param {string} url target url
+ * @returns {Promise<import('playwright').Page>} initialized page instance
+ */
+async function openPage (url) {
+	await ensureContext();
+	if (page) {
+		await page.close();
+	}
+	page = await context.newPage();
+	await page.goto(url, { waitUntil: "load" });
+	return page;
+}
+
+/**
+ * Close page, context and browser if they exist.
+ * @returns {Promise<void>}
+ */
+async function closeBrowser () {
+	if (page) {
+		await page.close();
+		page = null;
+	}
+	if (context) {
+		await context.close();
+		context = null;
+	}
+	if (browser) {
+		await browser.close();
+		browser = null;
+	}
+}
+
+exports.getPage = () => {
+	if (!page) {
+		throw new Error("Playwright page is not initialized. Call getDocument() first.");
+	}
+	return page;
+};
+
 
 exports.startApplication = async (configFilename, exec) => {
 	vi.resetModules();
@@ -35,7 +94,7 @@ exports.startApplication = async (configFilename, exec) => {
 	});
 
 	if (global.app) {
-		await this.stopApplication();
+		await exports.stopApplication();
 	}
 
 	// Use fixed port 8080 (tests run sequentially, no conflicts)
@@ -64,11 +123,7 @@ exports.startApplication = async (configFilename, exec) => {
 };
 
 exports.stopApplication = async (waitTime = 100) => {
-	if (global.window) {
-		// no closing causes test errors and memory leaks
-		global.window.close();
-		delete global.window;
-	}
+	await closeBrowser();
 
 	if (!global.app) {
 		delete global.testPort;
@@ -79,90 +134,23 @@ exports.stopApplication = async (waitTime = 100) => {
 	delete global.app;
 	delete global.testPort;
 
-	// Small delay to ensure clean shutdown
+	// Wait for any pending async operations to complete before closing DOM
 	await new Promise((resolve) => setTimeout(resolve, waitTime));
 };
 
-exports.getDocument = () => {
-	return new Promise((resolve) => {
-		const port = global.testPort || config.port || 8080;
-		const url = `http://${config.address || "localhost"}:${port}`;
-		jsdom.JSDOM.fromURL(url, { resources: "usable", runScripts: "dangerously" }).then((dom) => {
-			dom.window.name = "jsdom";
-			global.window = dom.window;
-			// Following fixes `navigator is not defined` errors in e2e tests, found here
-			// https://www.appsloveworld.com/reactjs/100/37/mocha-react-navigator-is-not-defined
-			global.navigator = {
-				useragent: "node.js"
-			};
-			dom.window.fetch = fetch;
-			dom.window.onload = () => {
-				global.document = dom.window.document;
-				resolve();
-			};
-		});
-	});
-};
+exports.getDocument = async () => {
+	const port = global.testPort || config.port || 8080;
+	const address = config.address === "0.0.0.0" ? "localhost" : config.address || "localhost";
+	const url = `http://${address}:${port}`;
 
-exports.waitForElement = (selector, ignoreValue = "", timeout = 0) => {
-	return new Promise((resolve) => {
-		let oldVal = "dummy12345";
-		let element = null;
-		const interval = setInterval(() => {
-			element = document.querySelector(selector);
-			if (element) {
-				let newVal = element.textContent;
-				if (newVal === oldVal) {
-					clearInterval(interval);
-					resolve(element);
-				} else {
-					if (ignoreValue === "") {
-						oldVal = newVal;
-					} else {
-						if (!newVal.includes(ignoreValue)) oldVal = newVal;
-					}
-				}
-			}
-		}, 100);
-		if (timeout !== 0) {
-			setTimeout(() => {
-				if (interval) clearInterval(interval);
-				resolve(null);
-			}, timeout);
-		}
-	});
-};
-
-exports.waitForAllElements = (selector) => {
-	return new Promise((resolve) => {
-		let oldVal = 999999;
-		const interval = setInterval(() => {
-			const element = document.querySelectorAll(selector);
-			if (element) {
-				let newVal = element.length;
-				if (newVal === oldVal) {
-					clearInterval(interval);
-					resolve(element);
-				} else {
-					if (newVal !== 0) oldVal = newVal;
-				}
-			}
-		}, 100);
-	});
-};
-
-exports.testMatch = async (element, regex) => {
-	const elem = await this.waitForElement(element);
-	expect(elem).not.toBeNull();
-	expect(elem.textContent).toMatch(regex);
-	return true;
+	await openPage(url);
 };
 
 exports.fixupIndex = async () => {
 	// read and save the git level index file
 	indexData = (await fs.promises.readFile(indexFile)).toString();
 	// make lines of the content
-	let workIndexLines = indexData.split(os.EOL);
+	const workIndexLines = indexData.split(os.EOL);
 	// loop thru the lines to find place to insert new region
 	for (let l in workIndexLines) {
 		if (workIndexLines[l].includes("region top right")) {
@@ -181,7 +169,7 @@ exports.fixupIndex = async () => {
 
 exports.restoreIndex = async () => {
 	// if we read in data
-	if (indexData.length > 1) {
+	if (indexData.length > 0) {
 		//write out saved index.html
 		await fs.promises.writeFile(indexFile, indexData, { flush: true });
 		// write out saved custom.css

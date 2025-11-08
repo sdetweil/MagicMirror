@@ -16,6 +16,7 @@ function createTranslationTestEnvironment () {
 
 	dom.window.Log = { log: vi.fn(), error: vi.fn() };
 	dom.window.translations = translations;
+	dom.window.fetch = fetch;
 	dom.window.eval(translatorJs);
 
 	const window = dom.window;

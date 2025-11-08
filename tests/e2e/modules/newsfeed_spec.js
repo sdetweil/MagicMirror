@@ -1,29 +1,28 @@
 const fs = require("node:fs");
+const { expect } = require("playwright/test");
 const helpers = require("../helpers/global-setup");
 
 const runTests = async () => {
+	let page;
+
 	describe("Default configuration", () => {
 		beforeAll(async () => {
 			await helpers.startApplication("tests/configs/modules/newsfeed/default.js");
 			await helpers.getDocument();
+			page = helpers.getPage();
 		});
 
 		it("should show the newsfeed title", async () => {
-			const elem = await helpers.waitForElement(".newsfeed .newsfeed-source");
-			expect(elem).not.toBeNull();
-			expect(elem.textContent).toContain("Rodrigo Ramirez Blog");
+			await expect(page.locator(".newsfeed .newsfeed-source")).toContainText("Rodrigo Ramirez Blog");
 		});
 
 		it("should show the newsfeed article", async () => {
-			const elem = await helpers.waitForElement(".newsfeed .newsfeed-title");
-			expect(elem).not.toBeNull();
-			expect(elem.textContent).toContain("QPanel");
+			await expect(page.locator(".newsfeed .newsfeed-title")).toContainText("QPanel");
 		});
 
 		it("should NOT show the newsfeed description", async () => {
-			await helpers.waitForElement(".newsfeed");
-			const elem = document.querySelector(".newsfeed .newsfeed-desc");
-			expect(elem).toBeNull();
+			await page.locator(".newsfeed").waitFor({ state: "visible" });
+			await expect(page.locator(".newsfeed .newsfeed-desc")).toHaveCount(0);
 		});
 	});
 
@@ -31,18 +30,18 @@ const runTests = async () => {
 		beforeAll(async () => {
 			await helpers.startApplication("tests/configs/modules/newsfeed/prohibited_words.js");
 			await helpers.getDocument();
+			page = helpers.getPage();
 		});
 
 		it("should not show articles with prohibited words", async () => {
-			const elem = await helpers.waitForElement(".newsfeed .newsfeed-title");
-			expect(elem).not.toBeNull();
-			expect(elem.textContent).toContain("Problema VirtualBox");
+			await expect(page.locator(".newsfeed .newsfeed-title")).toContainText("Problema VirtualBox");
 		});
 
 		it("should show the newsfeed description", async () => {
-			const elem = await helpers.waitForElement(".newsfeed .newsfeed-desc");
-			expect(elem).not.toBeNull();
-			expect(elem.textContent).not.toHaveLength(0);
+			const locator = page.locator(".newsfeed .newsfeed-desc");
+			await expect(locator).toBeVisible();
+			const text = await locator.textContent();
+			expect(text).toMatch(/\S/);
 		});
 	});
 
@@ -50,12 +49,11 @@ const runTests = async () => {
 		beforeAll(async () => {
 			await helpers.startApplication("tests/configs/modules/newsfeed/incorrect_url.js");
 			await helpers.getDocument();
+			page = helpers.getPage();
 		});
 
 		it("should show malformed url warning", async () => {
-			const elem = await helpers.waitForElement(".newsfeed .small", "No news at the moment.");
-			expect(elem).not.toBeNull();
-			expect(elem.textContent).toContain("Error in the Newsfeed module. Malformed url.");
+			await expect(page.locator(".newsfeed .small")).toContainText("Error in the Newsfeed module. Malformed url.");
 		});
 	});
 
@@ -63,12 +61,11 @@ const runTests = async () => {
 		beforeAll(async () => {
 			await helpers.startApplication("tests/configs/modules/newsfeed/ignore_items.js");
 			await helpers.getDocument();
+			page = helpers.getPage();
 		});
 
 		it("should show empty items info message", async () => {
-			const elem = await helpers.waitForElement(".newsfeed .small");
-			expect(elem).not.toBeNull();
-			expect(elem.textContent).toContain("No news at the moment.");
+			await expect(page.locator(".newsfeed .small")).toContainText("No news at the moment.");
 		});
 	});
 };

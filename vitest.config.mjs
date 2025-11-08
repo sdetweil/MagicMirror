@@ -8,28 +8,21 @@ import {defineConfig} from "vitest/config";
  *
  * Parallel execution would require dynamic ports and isolated fixtures,
  * so we intentionally cap Vitest at a single worker for now.
+ *
+ * Projects separate unit, e2e (Playwright), and electron tests with
+ * appropriate timeouts for each test type.
  */
 
 export default defineConfig({
 	test: {
-		// Global settings
+		// Shared settings for all test types
 		globals: true,
 		environment: "node",
-		// Setup files for require aliasing
 		setupFiles: ["./tests/utils/vitest-setup.js"],
-		// Increased from 20s to 60s for E2E tests, 120s for Electron tests
-		testTimeout: 120000,
-		// Increase hook timeout for Electron cleanup
-		hookTimeout: 30000,
 		// Stop test execution on first failure
-		bail: 1,
+		bail: 3,
 
-		// File patterns
-		include: [
-			"tests/**/*_spec.js",
-			// Legacy regression test without the _spec suffix
-			"tests/unit/modules/default/calendar/calendar_fetcher_utils_bad_rrule.js"
-		],
+		// Shared exclude patterns
 		exclude: [
 			"**/node_modules/**",
 			"**/dist/**",
@@ -40,6 +33,46 @@ export default defineConfig({
 			"tests/e2e/mocks/**",
 			"tests/configs/**",
 			"tests/utils/**"
+		],
+
+		// Projects with specific configurations per test type
+		projects: [
+			{
+				test: {
+					name: "unit",
+					globals: true,
+					environment: "node",
+					setupFiles: ["./tests/utils/vitest-setup.js"],
+					include: [
+						"tests/unit/**/*_spec.js",
+						"tests/unit/modules/default/calendar/calendar_fetcher_utils_bad_rrule.js"
+					],
+					testTimeout: 20000,
+					hookTimeout: 10000
+				}
+			},
+			{
+				test: {
+					name: "e2e",
+					globals: true,
+					environment: "node",
+					setupFiles: ["./tests/utils/vitest-setup.js"],
+					include: ["tests/e2e/**/*_spec.js"],
+					testTimeout: 60000,
+					hookTimeout: 30000
+				}
+			},
+			{
+				test: {
+					name: "electron",
+					globals: true,
+					environment: "node",
+					setupFiles: ["./tests/utils/vitest-setup.js"],
+					include: ["tests/electron/**/*_spec.js"],
+					testTimeout: 120000,
+					hookTimeout: 30000
+				}
+			}
 		],
 
 		// Coverage configuration

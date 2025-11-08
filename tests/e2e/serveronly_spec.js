@@ -38,11 +38,13 @@ describe("App environment", () => {
 describe("Check config", () => {
 	it("config check should return without errors", async () => {
 		process.env.MM_CONFIG_FILE = "tests/configs/default.js";
-		await expect(runConfigCheck()).resolves.toBe(0);
+		const exitCode = await runConfigCheck();
+		expect(exitCode).toBe(0);
 	});
 
 	it("config check should fail with non existent config file", async () => {
 		process.env.MM_CONFIG_FILE = "tests/configs/not_exists.js";
-		await expect(runConfigCheck()).resolves.toBe(1);
+		const exitCode = await runConfigCheck();
+		expect(exitCode).toBe(1);
 	});
 });

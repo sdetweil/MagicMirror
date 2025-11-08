@@ -11,12 +11,35 @@ const Loader = (function () {
 	/* Private Methods */
 
 	/**
+	 * Get environment variables from config.
+	 * @returns {object} Env vars with modulesDir and customCss paths from config.
+	 */
+	const getEnvVarsFromConfig = function () {
+		return {
+			modulesDir: config.foreignModulesDir || "modules",
+			customCss: config.customCss || "css/custom.css"
+		};
+	};
+
+	/**
 	 * Retrieve object of env variables.
 	 * @returns {object} with key: values as assembled in js/server_functions.js
 	 */
 	const getEnvVars = async function () {
-		const res = await fetch(`${location.protocol}//${location.host}${config.basePath}env`);
-		return JSON.parse(await res.text());
+		// In test mode, skip server fetch and use config values directly
+		if (typeof process !== "undefined" && process.env && process.env.mmTestMode === "true") {
+			return getEnvVarsFromConfig();
+		}
+
+		// In production, fetch env vars from server
+		try {
+			const res = await fetch(new URL("env", `${location.origin}${config.basePath}`));
+			return JSON.parse(await res.text());
+		} catch (error) {
+			// Fallback to config values if server fetch fails
+			Log.error("Unable to retrieve env configuration", error);
+			return getEnvVarsFromConfig();
+		}
 	};
 
 	/**
