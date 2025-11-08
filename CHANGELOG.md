@@ -19,7 +19,7 @@ planned for 2026-01-01
 
 ### Removed
 
-- [weather] Removed deprecated ukmetoffice datapoint provider (#3842, #3952)
+- [weather] Removed deprecated `ukmetoffice` datapoint provider (#3842, #3952)
 
 ### Changed
 
