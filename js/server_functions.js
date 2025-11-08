@@ -30,6 +30,7 @@ function getStartup (req, res) {
  * Only the url-param of the input request url is required. It must be the last parameter.
  * @param {Request} req - the request
  * @param {Response} res - the result
+ * @returns {Promise<void>} A promise that resolves when the response is sent
  */
 async function cors (req, res) {
 	try {
@@ -40,29 +41,32 @@ async function cors (req, res) {
 		if (!match) {
 			url = `invalid url: ${req.url}`;
 			Log.error(url);
-			res.send(url);
+			return res.status(400).send(url);
 		} else {
 			url = match[1];
 
 			const headersToSend = getHeadersToSend(req.url);
 			const expectedReceivedHeaders = geExpectedReceivedHeaders(req.url);
-
 			Log.log(`cors url: ${url}`);
-			const response = await fetch(url, { headers: headersToSend });
 
-			for (const header of expectedReceivedHeaders) {
-				const headerValue = response.headers.get(header);
-				if (header) res.set(header, headerValue);
+			const response = await fetch(url, { headers: headersToSend });
+			if (response.ok) {
+				for (const header of expectedReceivedHeaders) {
+					const headerValue = response.headers.get(header);
+					if (header) res.set(header, headerValue);
+				}
+				const data = await response.text();
+				res.send(data);
+			} else {
+				throw new Error(`Response status: ${response.status}`);
 			}
-			const data = await response.text();
-			res.send(data);
 		}
 	} catch (error) {
 		// Only log errors in non-test environments to keep test output clean
 		if (process.env.mmTestMode !== "true") {
-			Log.error(error);
+			Log.error(`Error in CORS request: ${error}`);
 		}
-		res.send(error);
+		res.status(500).json({ error: error.message });
 	}
 }
 
