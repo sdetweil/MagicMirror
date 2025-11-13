@@ -42,19 +42,19 @@ const WeatherProvider = Class.extend({
 	// This method should start the API request to fetch the current weather.
 	// This method should definitely be overwritten in the provider.
 	fetchCurrentWeather () {
-		Log.warn(`[weatherprovider] ${this.providerName} does not subclass the fetchCurrentWeather method.`);
+		Log.warn(`[weatherprovider] ${this.providerName} does not override the fetchCurrentWeather method.`);
 	},
 
 	// This method should start the API request to fetch the weather forecast.
 	// This method should definitely be overwritten in the provider.
 	fetchWeatherForecast () {
-		Log.warn(`[weatherprovider] ${this.providerName} does not subclass the fetchWeatherForecast method.`);
+		Log.warn(`[weatherprovider] ${this.providerName} does not override the fetchWeatherForecast method.`);
 	},
 
 	// This method should start the API request to fetch the weather hourly.
 	// This method should definitely be overwritten in the provider.
 	fetchWeatherHourly () {
-		Log.warn(`[weatherprovider] ${this.providerName} does not subclass the fetchWeatherHourly method.`);
+		Log.warn(`[weatherprovider] ${this.providerName} does not override the fetchWeatherHourly method.`);
 	},
 
 	// This returns a WeatherDay object for the current weather.

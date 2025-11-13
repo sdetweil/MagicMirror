@@ -7,9 +7,9 @@
 const Module = Class.extend({
 
 	/**
-	 ********************************************************
-	 * All methods (and properties) below can be subclassed. *
-	 ********************************************************
+	 *********************************************************
+	 * All methods (and properties) below can be overridden. *
+	 *********************************************************
 	 */
 
 	// Set the minimum MagicMirror² module version for this module.
@@ -75,8 +75,8 @@ const Module = Class.extend({
 
 	/**
 	 * Generates the dom which needs to be displayed. This method is called by the MagicMirror² core.
-	 * This method can to be subclassed if the module wants to display info on the mirror.
-	 * Alternatively, the getTemplate method could be subclassed.
+	 * This method can to be overridden if the module wants to display info on the mirror.
+	 * Alternatively, the getTemplate method could be overridden.
 	 * @returns {HTMLElement|Promise} The dom or a promise with the dom to display.
 	 */
 	getDom () {
@@ -109,7 +109,7 @@ const Module = Class.extend({
 	/**
 	 * Generates the header string which needs to be displayed if a user has a header configured for this module.
 	 * This method is called by the MagicMirror² core, but only if the user has configured a default header for the module.
-	 * This method needs to be subclassed if the module wants to display modified headers on the mirror.
+	 * This method needs to be overridden if the module wants to display modified headers on the mirror.
 	 * @returns {string} The header to display above the header.
 	 */
 	getHeader () {
@@ -118,8 +118,8 @@ const Module = Class.extend({
 
 	/**
 	 * Returns the template for the module which is used by the default getDom implementation.
-	 * This method needs to be subclassed if the module wants to use a template.
-	 * It can either return a template sting, or a template filename.
+	 * This method needs to be overridden if the module wants to use a template.
+	 * It can either return a template string, or a template filename.
 	 * If the string ends with '.html' it's considered a file from within the module's folder.
 	 * @returns {string} The template string of filename.
 	 */
@@ -129,7 +129,7 @@ const Module = Class.extend({
 
 	/**
 	 * Returns the data to be used in the template.
-	 * This method needs to be subclassed if the module wants to use a custom data.
+	 * This method needs to be overridden if the module wants to use a custom data.
 	 * @returns {object} The data for the template
 	 */
 	getTemplateData () {
@@ -196,9 +196,9 @@ const Module = Class.extend({
 	},
 
 	/**
-	 ********************************************
-	 * The methods below don't need subclassing. *
-	 ********************************************
+	 ***********************************************
+	 * The methods below should not be overridden. *
+	 ***********************************************
 	 */
 
 	/**
