@@ -113,8 +113,11 @@ NodeHelper.checkFetchError = function (error) {
 	let error_type = "MODULE_ERROR_UNSPECIFIED";
 	if (error.code === "EAI_AGAIN") {
 		error_type = "MODULE_ERROR_NO_CONNECTION";
-	} else if (error.message === "Unauthorized") {
-		error_type = "MODULE_ERROR_UNAUTHORIZED";
+	} else {
+		const message = typeof error.message === "string" ? error.message.toLowerCase() : "";
+		if (message.includes("unauthorized") || message.includes("http 401") || message.includes("http 403")) {
+			error_type = "MODULE_ERROR_UNAUTHORIZED";
+		}
 	}
 	return error_type;
 };

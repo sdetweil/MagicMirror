@@ -26,7 +26,7 @@ Log.log("Create fetcher ...");
 const fetcher = new CalendarFetcher(url, fetchInterval, [], maximumEntries, maximumNumberOfDays, auth);
 
 fetcher.onReceive(function (fetcher) {
-	Log.log(fetcher.events());
+	Log.log(fetcher.events);
 	process.exit(0);
 });
 

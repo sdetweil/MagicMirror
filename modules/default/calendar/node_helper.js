@@ -20,7 +20,7 @@ module.exports = NodeHelper.create({
 				this.sendSocketNotification("CALENDAR_ERROR", { error_type: "MODULE_ERROR_UNSPECIFIED" });
 				return;
 			}
-			this.fetchers[key].startFetch();
+			this.fetchers[key].fetchCalendar();
 		}
 	},
 
@@ -61,7 +61,7 @@ module.exports = NodeHelper.create({
 			});
 
 			fetcher.onError((fetcher, error) => {
-				Log.error("Calendar Error. Could not fetch calendar: ", fetcher.url(), error);
+				Log.error("Calendar Error. Could not fetch calendar: ", fetcher.url, error);
 				let error_type = NodeHelper.checkFetchError(error);
 				this.sendSocketNotification("CALENDAR_ERROR", {
 					id: identifier,
@@ -76,7 +76,7 @@ module.exports = NodeHelper.create({
 			fetcher.broadcastEvents();
 		}
 
-		fetcher.startFetch();
+		fetcher.fetchCalendar();
 	},
 
 	/**
@@ -87,8 +87,8 @@ module.exports = NodeHelper.create({
 	broadcastEvents (fetcher, identifier) {
 		this.sendSocketNotification("CALENDAR_EVENTS", {
 			id: identifier,
-			url: fetcher.url(),
-			events: fetcher.events()
+			url: fetcher.url,
+			events: fetcher.events
 		});
 	}
 });
