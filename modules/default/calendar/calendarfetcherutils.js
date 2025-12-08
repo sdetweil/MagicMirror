@@ -9,60 +9,26 @@ const CalendarFetcherUtils = {
 
 	/**
 	 * Determine based on the title of an event if it should be excluded from the list of events
-	 * TODO This seems like an overly complicated way to exclude events based on the title.
 	 * @param {object} config the global config
 	 * @param {string} title the title of the event
 	 * @returns {object} excluded: true if the event should be excluded, false otherwise
 	 * until: the date until the event should be excluded.
 	 */
 	shouldEventBeExcluded (config, title) {
-		let result = {
+		for (const filterConfig of config.excludedEvents) {
+			const match = CalendarFetcherUtils.checkEventAgainstFilter(title, filterConfig);
+			if (match) {
+				return {
+					excluded: !match.until,
+					until: match.until
+				};
+			}
+		}
+
+		return {
 			excluded: false,
 			until: null
 		};
-		for (let f in config.excludedEvents) {
-			let filter = config.excludedEvents[f],
-				testTitle = title.toLowerCase(),
-				until = null,
-				useRegex = false,
-				regexFlags = "g";
-
-			if (filter instanceof Object) {
-				if (typeof filter.until !== "undefined") {
-					until = filter.until;
-				}
-
-				if (typeof filter.regex !== "undefined") {
-					useRegex = filter.regex;
-				}
-
-				// If additional advanced filtering is added in, this section
-				// must remain last as we overwrite the filter object with the
-				// filterBy string
-				if (filter.caseSensitive) {
-					filter = filter.filterBy;
-					testTitle = title;
-				} else if (useRegex) {
-					filter = filter.filterBy;
-					testTitle = title;
-					regexFlags += "i";
-				} else {
-					filter = filter.filterBy.toLowerCase();
-				}
-			} else {
-				filter = filter.toLowerCase();
-			}
-
-			if (CalendarFetcherUtils.titleFilterApplies(testTitle, filter, useRegex, regexFlags)) {
-				if (until) {
-					result.until = until;
-				} else {
-					result.excluded = true;
-				}
-				break;
-			}
-		}
-		return result;
 	},
 
 	/**
@@ -84,46 +50,44 @@ const CalendarFetcherUtils = {
 	 */
 	getMomentsFromRecurringEvent (event, pastLocalMoment, futureLocalMoment, durationInMs) {
 		const rule = event.rrule;
+		const isFullDayEvent = CalendarFetcherUtils.isFullDayEvent(event);
+		const eventTimezone = event.start.tz || CalendarFetcherUtils.getLocalTimezone();
 
-		// can cause problems with e.g. birthdays before 1900
-		if ((rule.options && rule.origOptions && rule.origOptions.dtstart && rule.origOptions.dtstart.getFullYear() < 1900) || (rule.options && rule.options.dtstart && rule.options.dtstart.getFullYear() < 1900)) {
-			rule.origOptions.dtstart.setYear(1900);
-			rule.options.dtstart.setYear(1900);
+		// rrule.js interprets years < 1900 as offsets from 1900, causing issues with some birthday calendars
+		if (rule.origOptions?.dtstart?.getFullYear() < 1900) {
+			rule.origOptions.dtstart.setFullYear(1900);
+		}
+		if (rule.options?.dtstart?.getFullYear() < 1900) {
+			rule.options.dtstart.setFullYear(1900);
 		}
 
-		// subtract the max of the duration of this event or 1 day to find events in the past that are currently still running and should therefor be displayed.
-		const oneDayInMs = 24 * 60 * 60000;
-		let searchFromDate = pastLocalMoment.clone().subtract(Math.max(durationInMs, oneDayInMs), "milliseconds").toDate();
-		let searchToDate = futureLocalMoment.clone().add(1, "days").toDate();
-		Log.debug(`Search for recurring events between: ${searchFromDate} and ${searchToDate}`);
+		// Expand search window to include ongoing events
+		const oneDayInMs = 24 * 60 * 60 * 1000;
+		const searchFromDate = pastLocalMoment.clone().subtract(Math.max(durationInMs, oneDayInMs), "milliseconds").toDate();
+		const searchToDate = futureLocalMoment.clone().add(1, "days").toDate();
 
-		// if until is set, and its a full day event, force the time to midnight. rrule gets confused with non-00 offset
-		// looks like MS Outlook sets the until time incorrectly for fullday events
-		if ((rule.options.until !== undefined) && CalendarFetcherUtils.isFullDayEvent(event)) {
-			Log.debug("fixup rrule until");
-			rule.options.until = moment(rule.options.until).clone().startOf("day").add(1, "day")
-				.toDate();
+		// For all-day events, extend "until" to end of day to include the final occurrence
+		if (isFullDayEvent && rule.options?.until) {
+			rule.options.until = moment(rule.options.until).endOf("day").toDate();
 		}
 
-		Log.debug("fix rrule start=", rule.options.dtstart);
-		Log.debug("event before rrule.between=", JSON.stringify(event, null, 2), "exdates=", event.exdate);
-		Log.debug(`RRule: ${rule.toString()}`);
-		rule.options.tzid = null; // RRule gets *very* confused with timezones
+		// Clear tzid to prevent rrule.js from double-adjusting times
+		if (rule.options) {
+			rule.options.tzid = null;
+		}
 
-		let dates = rule.between(searchFromDate, searchToDate, true, () => {
-			return true;
+		const dates = rule.between(searchFromDate, searchToDate, true) || [];
+
+		// Convert dates to moments in the appropriate timezone
+		// rrule.js returns UTC dates with tzid cleared, so we interpret them in the event's original timezone
+		return dates.map((date) => {
+			if (isFullDayEvent) {
+				// For all-day events, anchor to calendar day in event's timezone
+				return moment.tz(date, eventTimezone).startOf("day");
+			}
+			// For timed events, preserve the time in the event's original timezone
+			return moment.tz(date, "UTC").tz(eventTimezone, true);
 		});
-
-		Log.debug(`Title: ${event.summary}, with dates: \n\n${JSON.stringify(dates)}\n`);
-
-		// shouldn't need this  anymore, as RRULE not passed junk
-		dates = dates.filter((d) => {
-			return JSON.stringify(d) !== "null";
-		});
-
-		// Dates are returned in UTC timezone but with local datetime because tzid is null.
-		// So we map the date to a moment using the original timezone of the event.
-		return dates.map((d) => (event.start.tz ? moment.tz(d, "UTC").tz(event.start.tz, true) : moment.tz(d, "UTC").tz(CalendarFetcherUtils.getLocalTimezone(), true)));
 	},
 
 	/**
@@ -202,135 +166,51 @@ const CalendarFetcherUtils = {
 				const geo = event.geo || false;
 				const description = event.description || false;
 
-				// TODO This should be a separate function.
+				let instances = [];
 				if (event.rrule && typeof event.rrule !== "undefined" && !isFacebookBirthday) {
-					// Recurring event.
-					let moments = CalendarFetcherUtils.getMomentsFromRecurringEvent(event, pastLocalMoment, futureLocalMoment, durationMs);
-
-					// Loop through the set of moment entries to see which recurrences should be added to our event list.
-					// TODO This should create an event per moment so we can change anything we want.
-					for (let m in moments) {
-						let curEvent = event;
-						let showRecurrence = true;
-						let recurringEventStartMoment = moments[m].tz(CalendarFetcherUtils.getLocalTimezone()).clone();
-						let recurringEventEndMoment = recurringEventStartMoment.clone().add(durationMs, "ms");
-
-						let dateKey = recurringEventStartMoment.tz("UTC").format("YYYY-MM-DD");
-
-						Log.debug("event date dateKey=", dateKey);
-						// For each date that we're checking, it's possible that there is a recurrence override for that one day.
-						if (curEvent.recurrences !== undefined) {
-							Log.debug("have recurrences=", curEvent.recurrences);
-							if (curEvent.recurrences[dateKey] !== undefined) {
-								Log.debug("have a recurrence match for dateKey=", dateKey);
-								// We found an override, so for this recurrence, use a potentially different title, start date, and duration.
-								curEvent = curEvent.recurrences[dateKey];
-								// Some event start/end dates don't have timezones
-								if (curEvent.start.tz) {
-									recurringEventStartMoment = moment(curEvent.start).tz(curEvent.start.tz).tz(CalendarFetcherUtils.getLocalTimezone());
-								} else {
-									recurringEventStartMoment = moment(curEvent.start).tz(CalendarFetcherUtils.getLocalTimezone());
-								}
-								if (curEvent.end.tz) {
-									recurringEventEndMoment = moment(curEvent.end).tz(curEvent.end.tz).tz(CalendarFetcherUtils.getLocalTimezone());
-								} else {
-									recurringEventEndMoment = moment(curEvent.end).tz(CalendarFetcherUtils.getLocalTimezone());
-								}
-							} else {
-								Log.debug("recurrence key ", dateKey, " doesn't match");
-							}
-						}
-						// If there's no recurrence override, check for an exception date.  Exception dates represent exceptions to the rule.
-						if (curEvent.exdate !== undefined) {
-							Log.debug("have datekey=", dateKey, " exdates=", curEvent.exdate);
-							if (curEvent.exdate[dateKey] !== undefined) {
-								// This date is an exception date, which means we should skip it in the recurrence pattern.
-								showRecurrence = false;
-							}
-						}
-
-						if (recurringEventStartMoment.valueOf() === recurringEventEndMoment.valueOf()) {
-							recurringEventEndMoment = recurringEventEndMoment.endOf("day");
-						}
-
-						const recurrenceTitle = CalendarFetcherUtils.getTitleFromEvent(curEvent);
-
-						// If this recurrence ends before the start of the date range, or starts after the end of the date range, don"t add
-						// it to the event list.
-						if (recurringEventEndMoment.isBefore(pastLocalMoment) || recurringEventStartMoment.isAfter(futureLocalMoment)) {
-							showRecurrence = false;
-						}
-
-						if (CalendarFetcherUtils.timeFilterApplies(now, recurringEventEndMoment, eventFilterUntil)) {
-							showRecurrence = false;
-						}
-
-						if (showRecurrence === true) {
-							Log.debug(`saving event: ${recurrenceTitle}`);
-							newEvents.push({
-								title: recurrenceTitle,
-								startDate: recurringEventStartMoment.format("x"),
-								endDate: recurringEventEndMoment.format("x"),
-								fullDayEvent: CalendarFetcherUtils.isFullDayEvent(event),
-								recurringEvent: true,
-								class: event.class,
-								firstYear: event.start.getFullYear(),
-								location: location,
-								geo: geo,
-								description: description
-							});
-						} else {
-							Log.debug("not saving event ", recurrenceTitle, eventStartMoment);
-						}
-					}
-					// End recurring event parsing.
+					instances = CalendarFetcherUtils.expandRecurringEvent(event, pastLocalMoment, futureLocalMoment, durationMs);
 				} else {
-					// Single event.
 					const fullDayEvent = isFacebookBirthday ? true : CalendarFetcherUtils.isFullDayEvent(event);
-
-					// if the start and end are the same, then make end the 'end of day' value (start is at 00:00:00)
-					if (fullDayEvent && eventStartMoment.valueOf() === eventEndMoment.valueOf()) {
-						eventEndMoment = eventEndMoment.endOf("day");
+					let end = eventEndMoment;
+					if (fullDayEvent && eventStartMoment.valueOf() === end.valueOf()) {
+						end = end.endOf("day");
 					}
 
-					if (config.includePastEvents) {
-						// Past event is too far in the past, so skip.
-						if (eventEndMoment < pastLocalMoment) {
-							return;
-						}
-					} else {
-						// It's not a fullday event, and it is in the past, so skip.
-						if (!fullDayEvent && eventEndMoment < now) {
-							return;
-						}
+					instances.push({
+						event: event,
+						startMoment: eventStartMoment,
+						endMoment: end,
+						isRecurring: false
+					});
+				}
 
-						// It's a fullday event, and it is before today, So skip.
-						if (fullDayEvent && eventEndMoment <= now.startOf("day")) {
-							return;
-						}
+				for (const instance of instances) {
+					const { event: instanceEvent, startMoment, endMoment, isRecurring } = instance;
+
+					// Filter logic
+					if (endMoment.isBefore(pastLocalMoment) || startMoment.isAfter(futureLocalMoment)) {
+						continue;
 					}
 
-					// It exceeds the maximumNumberOfDays limit, so skip.
-					if (eventStartMoment > futureLocalMoment) {
-						return;
+					if (CalendarFetcherUtils.timeFilterApplies(now, endMoment, eventFilterUntil)) {
+						continue;
 					}
 
-					if (CalendarFetcherUtils.timeFilterApplies(now, eventEndMoment, eventFilterUntil)) {
-						return;
-					}
+					const title = CalendarFetcherUtils.getTitleFromEvent(instanceEvent);
+					const fullDay = isFacebookBirthday ? true : CalendarFetcherUtils.isFullDayEvent(event);
 
-					// Every thing is good. Add it to the list.
+					Log.debug(`saving event: ${title}`);
 					newEvents.push({
 						title: title,
-						startDate: eventStartMoment.format("x"),
-						endDate: eventEndMoment.format("x"),
-						fullDayEvent: fullDayEvent,
-						recurringEvent: false,
+						startDate: startMoment.format("x"),
+						endDate: endMoment.format("x"),
+						fullDayEvent: fullDay,
+						recurringEvent: isRecurring,
 						class: event.class,
 						firstYear: event.start.getFullYear(),
-						location: location,
-						geo: geo,
-						description: description
+						location: instanceEvent.location || location,
+						geo: instanceEvent.geo || geo,
+						description: instanceEvent.description || description
 					});
 				}
 			}
@@ -420,6 +300,106 @@ const CalendarFetcherUtils = {
 		} else {
 			return title.includes(filter);
 		}
+	},
+
+	/**
+	 * Expands a recurring event into individual event instances.
+	 * @param {object} event The recurring event object
+	 * @param {moment.Moment} pastLocalMoment The past date limit
+	 * @param {moment.Moment} futureLocalMoment The future date limit
+	 * @param {number} durationMs The duration of the event in milliseconds
+	 * @returns {object[]} Array of event instances
+	 */
+	expandRecurringEvent (event, pastLocalMoment, futureLocalMoment, durationMs) {
+		const moments = CalendarFetcherUtils.getMomentsFromRecurringEvent(event, pastLocalMoment, futureLocalMoment, durationMs);
+		const instances = [];
+
+		for (const startMoment of moments) {
+			let curEvent = event;
+			let showRecurrence = true;
+			let recurringEventStartMoment = startMoment.clone().tz(CalendarFetcherUtils.getLocalTimezone());
+			let recurringEventEndMoment = recurringEventStartMoment.clone().add(durationMs, "ms");
+
+			const dateKey = recurringEventStartMoment.tz("UTC").format("YYYY-MM-DD");
+
+			// Check for overrides
+			if (curEvent.recurrences !== undefined) {
+				if (curEvent.recurrences[dateKey] !== undefined) {
+					curEvent = curEvent.recurrences[dateKey];
+					// Re-calculate start/end based on override
+					const start = curEvent.start;
+					const end = curEvent.end;
+					const localTimezone = CalendarFetcherUtils.getLocalTimezone();
+
+					recurringEventStartMoment = (start.tz ? moment(start).tz(start.tz) : moment(start)).tz(localTimezone);
+					recurringEventEndMoment = (end.tz ? moment(end).tz(end.tz) : moment(end)).tz(localTimezone);
+				}
+			}
+
+			// Check for exceptions
+			if (curEvent.exdate !== undefined) {
+				if (curEvent.exdate[dateKey] !== undefined) {
+					showRecurrence = false;
+				}
+			}
+
+			if (recurringEventStartMoment.valueOf() === recurringEventEndMoment.valueOf()) {
+				recurringEventEndMoment = recurringEventEndMoment.endOf("day");
+			}
+
+			if (showRecurrence) {
+				instances.push({
+					event: curEvent,
+					startMoment: recurringEventStartMoment,
+					endMoment: recurringEventEndMoment,
+					isRecurring: true
+				});
+			}
+		}
+		return instances;
+	},
+
+	/**
+	 * Checks if an event title matches a specific filter configuration.
+	 * @param {string} title The event title to check
+	 * @param {string|object} filterConfig The filter configuration (string or object)
+	 * @returns {object|null} Object with {until: string|null} if matched, null otherwise
+	 */
+	checkEventAgainstFilter (title, filterConfig) {
+		let filter = filterConfig;
+		let testTitle = title.toLowerCase();
+		let until = null;
+		let useRegex = false;
+		let regexFlags = "g";
+
+		if (filter instanceof Object) {
+			if (typeof filter.until !== "undefined") {
+				until = filter.until;
+			}
+
+			if (typeof filter.regex !== "undefined") {
+				useRegex = filter.regex;
+			}
+
+			if (filter.caseSensitive) {
+				filter = filter.filterBy;
+				testTitle = title;
+			} else if (useRegex) {
+				filter = filter.filterBy;
+				testTitle = title;
+				regexFlags += "i";
+			} else {
+				filter = filter.filterBy.toLowerCase();
+			}
+		} else {
+			filter = filter.toLowerCase();
+		}
+
+		if (CalendarFetcherUtils.titleFilterApplies(testTitle, filter, useRegex, regexFlags)) {
+			return { until };
+		}
+
+		return null;
 	}
 };
 

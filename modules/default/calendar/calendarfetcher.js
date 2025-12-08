@@ -38,6 +38,7 @@ class CalendarFetcher {
 		this.events = [];
 		this.reloadTimer = null;
 		this.serverErrorCount = 0;
+		this.lastFetch = null;
 		this.fetchFailedCallback = () => {};
 		this.eventsReceivedCallback = () => {};
 	}
@@ -165,6 +166,7 @@ class CalendarFetcher {
 						maximumEntries: this.maximumEntries,
 						maximumNumberOfDays: this.maximumNumberOfDays
 					});
+					this.lastFetch = Date.now();
 					this.broadcastEvents();
 				} catch (error) {
 					Log.error(`${this.url} - iCal parsing failed: ${error.message}`);
@@ -177,6 +179,19 @@ class CalendarFetcher {
 		}
 
 		this.scheduleNextFetch(nextDelay);
+	}
+
+	/**
+	 * Check if enough time has passed since the last fetch to warrant a new one.
+	 * Uses reloadInterval as the threshold to respect user's configured fetchInterval.
+	 * @returns {boolean} True if a new fetch should be performed
+	 */
+	shouldRefetch () {
+		if (!this.lastFetch) {
+			return true;
+		}
+		const timeSinceLastFetch = Date.now() - this.lastFetch;
+		return timeSinceLastFetch >= this.reloadInterval;
 	}
 
 	/**
